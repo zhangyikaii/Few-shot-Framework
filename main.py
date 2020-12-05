@@ -19,3 +19,4 @@ if __name__ == '__main__':
     Training
     """
     trainer = Trainer(args)
+    trainer.fit()

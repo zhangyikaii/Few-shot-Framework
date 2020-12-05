@@ -16,7 +16,7 @@ sys.path.append("../../")
 sys.path.extend([os.path.join(root, name) for root, dirs, _ in os.walk("../") for name in dirs])
 
 from config import DATA_PATH
-from models.core import NShotTaskSampler
+from models.sampler import NShotTaskSampler
 THIS_PATH = osp.dirname(__file__)
 ROOT_PATH = osp.abspath(osp.join(THIS_PATH, '..', '..'))
 IMAGE_PATH = osp.join(DATA_PATH, 'data/mini_imagenet/images')

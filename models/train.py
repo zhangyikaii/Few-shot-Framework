@@ -6,26 +6,25 @@ from typing import Callable, List, Union
 
 from models.callbacks import DefaultCallback, ProgressBarLogger, CallbackList, Callback
 
-from models.dataloader.mini_imagenet import (
-    get_dataloader
-)
+from models.dataloader.mini_imagenet import get_dataloader
+from models.utils import PrepareFunc
 
-def gradient_step(model: Module, optimiser: Optimizer, loss_fn: Callable, x: torch.Tensor, y: torch.Tensor, **kwargs):
+def gradient_step(model: Module, optimizer: Optimizer, loss_fn: Callable, x: torch.Tensor, y: torch.Tensor, **kwargs):
     """Takes a single gradient step.
 
     # Arguments
         model: Model to be fitted
-        optimiser: Optimiser to calculate gradient step from loss
+        optimizer: optimizer to calculate gradient step from loss
         loss_fn: Loss function to calculate between predictions and outputs
         x: Input samples
         y: Input targets
     """
     model.train()
-    optimiser.zero_grad()
+    optimizer.zero_grad()
     y_pred = model(x)
     loss = loss_fn(y_pred, y)
     loss.backward()
-    optimiser.step()
+    optimizer.step()
 
     return loss, y_pred
 
@@ -39,13 +38,15 @@ class Trainer(object):
         """
         准备 Model, Optimizer, loss_func, callbacks
         """
-        self.model, self.para_model = prepare_model(args)
-        self.optimizer, self.lr_scheduler = prepare_optimizer(self.model, args)
-        
+        prepare_handle = PrepareFunc(args)
+        self.model, self.para_model = prepare_handle.prepare_model()
+        self.optimizer, self.lr_scheduler = prepare_handle.prepare_optimizer(self.model)
+        self.loss_fn = prepare_handle.prepare_loss_func()
+        # 接下来要准备fit函数之前的所有东西, 包括callbacks.
 
-    def fit(model: Module, optimiser: Optimizer, loss_fn: Callable, epochs: int, dataloader: DataLoader,
-            prepare_batch: Callable, metrics: List[Union[str, Callable]] = None, callbacks: List[Callback] = None,
-            verbose: bool =True, fit_function: Callable = gradient_step, fit_function_kwargs: dict = {}):
+        self.callbacks = CallbackList([DefaultCallback(), ] + (callbacks or []) + [ProgressBarLogger(), ])
+
+    def fit(self):
         """Function to abstract away training loop.
 
         The benefit of this function is that allows training scripts to be much more readable and allows for easy re-use of
@@ -54,7 +55,7 @@ class Trainer(object):
 
         # Arguments
             model: Model to be fitted.
-            optimiser: Optimiser to calculate gradient step from loss
+            optimizer: optimizer to calculate gradient step from loss
             loss_fn: Loss function to calculate between predictions and outputs
             epochs: Number of epochs of fitting to be performed
             dataloader: `torch.DataLoader` instance to fit the model to
@@ -72,7 +73,6 @@ class Trainer(object):
         num_batches = len(dataloader)
         batch_size = dataloader.batch_size
 
-        callbacks = CallbackList([DefaultCallback(), ] + (callbacks or []) + [ProgressBarLogger(), ])
         callbacks.set_model(model)
         callbacks.set_params({
             'num_batches': num_batches,
@@ -81,7 +81,7 @@ class Trainer(object):
             'metrics': (metrics or []),
             'prepare_batch': prepare_batch,
             'loss_fn': loss_fn,
-            'optimiser': optimiser
+            'optimizer': optimizer
         })
 
         if verbose:
@@ -105,7 +105,7 @@ class Trainer(object):
                 # writer.add_graph(model, (x,))
 
                 # 注意这里的fit_function是根据用的模型来定的.
-                loss, y_pred = fit_function(model, optimiser, loss_fn, x, y, **fit_function_kwargs)
+                loss, y_pred = fit_function(model, optimizer, loss_fn, x, y, **fit_function_kwargs)
                 batch_logs['loss'] = loss.item()
 
                 # Loops through all metrics

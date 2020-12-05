@@ -78,3 +78,7 @@ models.py 里面的encoder()就是backbone.
 + `we use ADAM for ConvNet and SGD for other backbones` 为啥其他backbone就是sgd?
 
 + 2020-12-5 09:03:12 接下来构建`ProtoNet`
+
++ 注意, `prepare_nshot_task` 还要再写. 其实就是准备 `y` Label而已.
+
++ 期望的结果是增加模型后不用改动太多的文件, 即不同该`utils.py`文件
