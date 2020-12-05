@@ -2,13 +2,15 @@ import torch
 import os.path as osp
 from PIL import Image
 
-from torch.utils.data import Dataset
+from torch.utils.data import (
+    Dataset,
+    DataLoader
+)
 from torchvision import transforms
-from tqdm import tqdm
 import numpy as np
 from skimage import io
 import pandas as pd
-import os
+import os, sys
 
 sys.path.append("../../")
 sys.path.extend([os.path.join(root, name) for root, dirs, _ in os.walk("../") for name in dirs])
@@ -51,7 +53,7 @@ class MiniImageNet(Dataset):
 
         # 数据预处理:
         # Setup transforms
-        # trick 1
+        # trick
 
         ### few-shot code:
         # self.transform = transforms.Compose([
@@ -136,7 +138,7 @@ class MiniImageNet(Dataset):
 
         lines = [x.strip() for x in open(csv_path, 'r').readlines()][1:]
         
-        for l in tqdm(lines, ncols=64):
+        for l in lines:
             img_name, class_name = l.split(',')
             path = osp.join(IMAGE_PATH, img_name)
             images.append({
@@ -146,12 +148,20 @@ class MiniImageNet(Dataset):
             })
         return images
 
-def dataloader_main(args):
-    train = eval(args.dataset)(stype, args)
-    train_taskloader = DataLoader(
-        train,
-        batch_sampler=NShotTaskSampler(train, episodes_per_epoch, args.shot, args.way, args.query),
-        num_workers=4
-    )
 
-    return train_taskloader
+def get_dataloader(args):
+    def taskloader(stype, args):
+        dataset = eval(args.dataset)(stype, args)
+        taskloader = DataLoader(
+            dataset,
+            batch_sampler=NShotTaskSampler(dataset, args.episodes_per_epoch, args.shot, args.way, args.query),
+            num_workers=4
+        )
+        return taskloader
+
+    train_taskloader, val_taskloader, test_taskloader = taskloader('train', args), \
+        taskloader('val', args), \
+        taskloader('test', args)
+
+    # return {'train': train_taskloader, 'val': val_taskloader, 'test': test_taskloader}
+    return train_taskloader, val_taskloader, test_taskloader

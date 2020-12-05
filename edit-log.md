@@ -69,3 +69,12 @@ models.py 里面的encoder()就是backbone.
 + `proto_net_episode` 的参数 `y` 是query set的label. 详见 `prepare_nshot_task`.
 
 + 纠正过来, 事实是: 训练时候 support 1-shot, query 20-shot.
+
+
+## Few-shot-Framework
+
++ 2020-12-4 21:35:51, 写完了Dataloader, 没测试. `MiniImageNet` 类还是要测一下, `augment` 参数没懂, 整个类和FEAT的还是不一样的.
+
++ `we use ADAM for ConvNet and SGD for other backbones` 为啥其他backbone就是sgd?
+
++ 2020-12-5 09:03:12 接下来构建`ProtoNet`

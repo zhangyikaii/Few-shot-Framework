@@ -3,8 +3,8 @@ from models.utils import (
     preprocess_args,
     pprint
 )
-from models.dataloader.mini_imagenet import (
-    dataloader_main
+from models.train import (
+    Trainer
 )
 
 if __name__ == '__main__':
@@ -16,18 +16,6 @@ if __name__ == '__main__':
     pprint(vars(args))
 
     """
-    准备 Dataloader
-    """
-    dataloaders = dataloader_main(args)
-
-
-    """
-    准备 Model, Optimizer, loss_func
-    """
-
-
-    """
     Training
     """
-
-
+    trainer = Trainer(args)
