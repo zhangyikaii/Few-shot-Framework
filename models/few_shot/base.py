@@ -24,6 +24,16 @@ class FewShotModel(nn.Module):
             self.encoder = Wide_ResNet(28, 10, 0.5)  # we set the dropout=0.5 directly here, it may achieve better results by tunning the dropout
         else:
             raise ValueError('')
+    
+    def split_instances(self, data):
+        args = self.args
+        if self.training:
+            return  (torch.Tensor(np.arange(args.way*args.shot)).long().view(1, args.shot, args.way), 
+                     torch.Tensor(np.arange(args.way*args.shot, args.way * (args.shot + args.query))).long().view(1, args.query, args.way))
+        else:
+            return  (torch.Tensor(np.arange(args.eval_way*args.eval_shot)).long().view(1, args.eval_shot, args.eval_way), 
+                     torch.Tensor(np.arange(args.eval_way*args.eval_shot, args.eval_way * (args.eval_shot + args.eval_query))).long().view(1, args.eval_query, args.eval_way))
+
 
     def forward(self, x, get_feature=False):
         if get_feature:

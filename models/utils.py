@@ -154,12 +154,13 @@ class PrepareFunc(object):
         if torch.cuda.is_available():
             torch.backends.cudnn.benchmark = True
             
-        model = model.to(self.device)
+        model = model.to(self.device, dtype=torch.double)
+
         if self.args.multi_gpu:
             model.encoder = nn.DataParallel(model.encoder, dim=0)
-            para_model = model.to(self.device)
+            para_model = model.to(self.device, dtype=torch.double)
         else:
-            para_model = model.to(self.device)
+            para_model = model.to(self.device, dtype=torch.double)
 
         return model, para_model
 

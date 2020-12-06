@@ -19,7 +19,7 @@ from config import DATA_PATH
 from models.sampler import NShotTaskSampler
 THIS_PATH = osp.dirname(__file__)
 ROOT_PATH = osp.abspath(osp.join(THIS_PATH, '..', '..'))
-IMAGE_PATH = osp.join(DATA_PATH, 'data/mini_imagenet/images')
+IMAGE_PATH = osp.join(DATA_PATH, 'mini_imagenet/images')
 SPLIT_PATH = osp.join(ROOT_PATH, 'data/mini_imagenet/split')
 CACHE_PATH = osp.join(ROOT_PATH, '.cache/')
 

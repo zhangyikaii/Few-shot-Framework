@@ -98,9 +98,9 @@ class Trainer(object):
             CSVLogger(osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/proto_nets/{args.params_str}.csv'),
         ]
         # LearningRateScheduler 最好直接在fit函数里面传一个lr_scheduler, 直接step吧. 看FEAT.
-        self.callbacks = CallbackList([DefaultCallback(metrics=self.metrics), ] 
-                                     + (callbacks or []) 
-                                     + [ProgressBarLogger(length=len(self.train_loader), metrics=self.metrics, verbose=self.verbose), ])
+        self.callbacks = CallbackList([DefaultCallback(metrics=['loss'] + self.metrics), ] 
+                                     + (callbacks or [])
+                                     + [ProgressBarLogger(length=len(self.train_loader), metrics=['loss'] + self.metrics, verbose=self.verbose), ])
 
     def batch_metrics(self, logits, y, batch_logs):
         self.model.eval()

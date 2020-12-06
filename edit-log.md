@@ -71,6 +71,15 @@ models.py 里面的encoder()就是backbone.
 + 纠正过来, 事实是: 训练时候 support 1-shot, query 20-shot.
 
 
+## Trick
+
+1. 野生数据预处理, FEAT里面似乎训练和测试还不一样, `RandomResizedCrop`, `ColorJitter` 之类的. 因为测试就只能按要求来?
+
+2. `num_tasks` 之类的参数?
+
+3. model & data: float32 or float64.
+
+
 ## Few-shot-Framework
 
 + 2020-12-4 21:35:51, 写完了Dataloader, 没测试. `MiniImageNet` 类还是要测一下, `augment` 参数没懂, 整个类和FEAT的还是不一样的.

@@ -11,7 +11,6 @@ def conv_block(in_channels, out_channels):
 
 
 class ConvNet(nn.Module):
-
     def __init__(self, x_dim=3, hid_dim=64, z_dim=64):
         super().__init__()
         self.encoder = nn.Sequential(
