@@ -2,11 +2,14 @@ from tqdm import tqdm
 import numpy as np
 import torch
 from collections import OrderedDict, Iterable
+from models.metrics import categorical_accuracy
 from typing import List, Iterable, Callable, Tuple
 import warnings
 import os
 import csv
 import io
+
+from models.utils import mkdir
 
 # init 函数传入的 callbacks 是一些对象(操纵类)集合.
 # CallbackList 控制 callbacks 之前加入的所有对象(以list形式).
@@ -25,10 +28,6 @@ class CallbackList(object):
     """
     def __init__(self, callbacks):
         self.callbacks = [c for c in callbacks]
-
-    def set_params(self, params):
-        for callback in self.callbacks:
-            callback.set_params(params)
 
     def set_model(self, model):
         for callback in self.callbacks:
@@ -99,10 +98,7 @@ class CallbackList(object):
 # 父类共享方法框架. 但注意这里只是方法, 不存模型.
 class Callback(object):
     def __init__(self):
-        self.params = None
         self.model = None
-    def set_params(self, params):
-        self.params = params
     def set_model(self, model):
         self.model = model
     def on_epoch_begin(self, epoch, logs=None):
@@ -128,10 +124,11 @@ class DefaultCallback(Callback):
 
     NB The metrics are calculated with a moving model
     """
-    def on_epoch_begin(self, batch, logs=None):
+    def __init__(self, metrics):
+        super(DefaultCallback, self).__init__()
+        self.metrics = metrics
         self.seen = 0
-        self.totals = {}
-        self.metrics = ['loss'] + self.params['metrics']
+        self.totals = {}        
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -154,19 +151,17 @@ class DefaultCallback(Callback):
 
 class ProgressBarLogger(Callback):
     """TQDM progress bar that displays the running average of loss and other metrics."""
-    def __init__(self):
+    def __init__(self, length, metrics, verbose=True):
         super(ProgressBarLogger, self).__init__()
         import torchvision
-
-    def on_train_begin(self, logs=None):
-        self.num_batches = self.params['num_batches']
-        self.verbose = self.params['verbose']
-        self.metrics = ['loss'] + self.params['metrics']
-
+        self.length = length
+        self.verbose = verbose
+        self.metrics = metrics
+    
     def on_epoch_begin(self, epoch, logs=None):
-        self.target = self.num_batches
-        self.pbar = tqdm(total=self.target, desc='Epoch {}'.format(epoch))
+        self.pbar = tqdm(total=self.length, desc='Epoch {}'.format(epoch))
         
+        # TensorBoard Test:
         from torch.utils.tensorboard import SummaryWriter
         self.writer = SummaryWriter('runs/epoch-' + str(epoch))
         self.seen = 0
@@ -188,7 +183,7 @@ class ProgressBarLogger(Callback):
         self.writer.add_scalar('Loss/train', self.log_values['loss'], self.seen)
         self.writer.add_scalar('Categorical Accuracy/train', self.log_values['categorical_accuracy'], self.seen)
 
-        if self.verbose and self.seen < self.target:
+        if self.verbose and self.seen < self.length:
             self.pbar.update(1)
             self.pbar.set_postfix(self.log_values)
 
@@ -230,6 +225,8 @@ class EvaluateFewShot(Callback):
                  q_queries: int,
                  taskloader: torch.utils.data.DataLoader,
                  prepare_batch: Callable,
+                 loss_fn: Callable,
+                 optimizer: Callable,
                  prefix: str = 'val_',
                  **kwargs):
         super(EvaluateFewShot, self).__init__()
@@ -243,10 +240,8 @@ class EvaluateFewShot(Callback):
         self.prefix = prefix
         self.kwargs = kwargs
         self.metric_name = f'{self.prefix}{self.n_shot}-shot_{self.k_way}-way_acc'
-
-    def on_train_begin(self, logs=None):
-        self.loss_fn = self.params['loss_fn']
-        self.optimiser = self.params['optimiser']
+        self.loss_fn = loss_fn
+        self.optimizer = optimizer
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -267,16 +262,9 @@ class EvaluateFewShot(Callback):
             # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
             # 就相当于forward.
             loss, y_pred = self.eval_fn(
-                self.model,
-                self.optimiser,
-                self.loss_fn,
                 x,
                 y,
-                n_shot=self.n_shot,
-                k_way=self.k_way,
-                q_queries=self.q_queries,
-                train=False,
-                **self.kwargs
+                train=False
             )
 
             seen += y_pred.shape[0]
@@ -320,7 +308,7 @@ class ModelCheckpoint(Callback):
         period: Interval (number of epochs) between checkpoints.
     """
 
-    def __init__(self, filepath, monitor='val_acc', verbose=True, save_best_only=True, mode='max', period=1):
+    def __init__(self, filepath, monitor='val_acc', verbose=True, save_best_only=True, mode='auto', period=1):
         super(ModelCheckpoint, self).__init__()
         self.monitor = monitor
         self.verbose = verbose
@@ -393,6 +381,7 @@ class CSVLogger(Callback):
     def __init__(self, filename, separator=',', append=False):
         self.sep = separator
         self.filename = filename
+        mkdir(filename[:filename.rfind('/')])
         self.append = append
         self.writer = None
         self.keys = None
@@ -401,7 +390,6 @@ class CSVLogger(Callback):
         self._open_args = {'newline': '\n'}
         super(CSVLogger, self).__init__()
 
-    def on_train_begin(self, logs=None):
         if self.append:
             if os.path.exists(self.filename):
                 with open(self.filename, 'r' + self.file_flags) as f:
@@ -451,43 +439,43 @@ class CSVLogger(Callback):
         self.writer = None
 
 
-class LearningRateScheduler(Callback):
-    """Learning rate scheduler.
-    # Arguments
-        schedule: a function that takes an epoch index as input
-            (integer, indexed from 0) and current learning rate
-            and returns a new learning rate as output (float).
-        verbose: int. 0: quiet, 1: update messages.
-    """
+# class LearningRateScheduler(Callback):
+#     """Learning rate scheduler.
+#     # Arguments
+#         schedule: a function that takes an epoch index as input
+#             (integer, indexed from 0) and current learning rate
+#             and returns a new learning rate as output (float).
+#         verbose: int. 0: quiet, 1: update messages.
+#     """
 
-    def __init__(self, schedule, verbose=True):
-        super(LearningRateScheduler, self).__init__()
-        self.schedule = schedule
-        self.verbose = verbose
+#     def __init__(self, schedule, verbose=True):
+#         super(LearningRateScheduler, self).__init__()
+#         self.schedule = schedule
+#         self.verbose = verbose
 
-    def on_train_begin(self, logs=None):
-        self.optimiser = self.params['optimiser']
+#     def on_train_begin(self, logs=None):
+#         self.optimizer = self.params['optimizer']
 
-    def on_epoch_begin(self, epoch, logs=None):
-        lrs = [self.schedule(epoch, param_group['lr']) for param_group in self.optimiser.param_groups]
+#     def on_epoch_begin(self, epoch, logs=None):
+#         lrs = [self.schedule(epoch, param_group['lr']) for param_group in self.optimizer.param_groups]
 
-        if not all(isinstance(lr, (float, np.float32, np.float64)) for lr in lrs):
-            raise ValueError('The output of the "schedule" function '
-                             'should be float.')
-        self.set_lr(epoch, lrs)
+#         if not all(isinstance(lr, (float, np.float32, np.float64)) for lr in lrs):
+#             raise ValueError('The output of the "schedule" function '
+#                              'should be float.')
+#         self.set_lr(epoch, lrs)
 
-    def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-        if len(self.optimiser.param_groups) == 1:
-            logs['lr'] = self.optimiser.param_groups[0]['lr']
-        else:
-            for i, param_group in enumerate(self.optimiser.param_groups):
-                logs['lr_{}'.format(i)] = param_group['lr']
+#     def on_epoch_end(self, epoch, logs=None):
+#         logs = logs or {}
+#         if len(self.optimizer.param_groups) == 1:
+#             logs['lr'] = self.optimizer.param_groups[0]['lr']
+#         else:
+#             for i, param_group in enumerate(self.optimizer.param_groups):
+#                 logs['lr_{}'.format(i)] = param_group['lr']
 
-    def set_lr(self, epoch, lrs):
-        for i, param_group in enumerate(self.optimiser.param_groups):
-            new_lr = lrs[i]
-            param_group['lr'] = new_lr
-            if self.verbose:
-                print('Epoch {:5d}: setting learning rate'
-                      ' of group {} to {:.4e}.'.format(epoch, i, new_lr))
+#     def set_lr(self, epoch, lrs):
+#         for i, param_group in enumerate(self.optimizer.param_groups):
+#             new_lr = lrs[i]
+#             param_group['lr'] = new_lr
+#             if self.verbose:
+#                 print('Epoch {:5d}: setting learning rate'
+#                       ' of group {} to {:.4e}.'.format(epoch, i, new_lr))

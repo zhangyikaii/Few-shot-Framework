@@ -13,13 +13,17 @@ from models.callbacks import (
     Callback,
     EvaluateFewShot,
     ModelCheckpoint,
-    CSVLogger,
-    LearningRateScheduler
+    CSVLogger
 )
 
 from models.dataloader.mini_imagenet import get_dataloader
 from models.utils import PrepareFunc
 from models.sampler import prepare_nshot_task
+
+from models.metrics import (
+    NAMED_METRICS,
+    categorical_accuracy
+)
 
 def gradient_step(model: Module, optimizer: Optimizer, loss_fn: Callable, x: torch.Tensor, y: torch.Tensor, **kwargs):
     """Takes a single gradient step.
@@ -59,43 +63,60 @@ class Trainer(object):
         # 接下来要准备fit函数之前的所有东西, 包括callbacks.
         # 记录数据所需:
         # 这里的params统一传到基类成员, 所有派生类共享. 注意这里一定要精简.
-        self.params = {
-            'max_epoch': args.max_epoch,
-            'num_batches': num_batches,
-            'batch_size': batch_size,
-            'verbose': args.verbose,
-            'metrics': (metrics or []),
-            'prepare_batch': prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query),
-            'loss_fn': self.loss_fn,
-            'optimizer': self.optimizer,
-            'lr_scheduler': self.lr_scheduler
-        }
+        self.metrics = ['categorical_accuracy']
+        self.prepare_batch = prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query)
+        self.verbose = args.verbose
+        self.max_epoch = args.max_epoch
+        # self.params = {
+        #     'max_epoch': args.max_epoch,
+        #     'verbose': args.verbose,
+        #     'metrics': (self.metrics or []),
+        #     'prepare_batch': prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query),
+        #     'loss_fn': self.loss_fn,
+        #     'optimizer': self.optimizer,
+        #     'lr_scheduler': self.lr_scheduler
+        # }
 
         # args 是一个参数集合, 期望在这里分模块, 对每个类 对应特定的功能, 类的参数也要**具体化**, 这样才可以一层层分解, 较好.
         callbacks = [
             EvaluateFewShot(
-                eval_fn=self.model.forward,
+                eval_fn=self.fit_handle,
                 num_tasks=args.num_tasks,
                 n_shot=args.eval_shot,
                 k_way=args.eval_way,
                 q_queries=args.eval_query,
                 taskloader=self.val_loader,
-                prepare_batch=self.params['prepare_batch'],
+                prepare_batch=self.prepare_batch,
+                loss_fn=self.loss_fn,
+                optimizer=self.optimizer,
                 distance=args.distance
             ),
-            LearningRateScheduler(schedule=self.lr_scheduler),
             ModelCheckpoint(
                 filepath=f'/mnt/data3/lus/zhangyk/models/proto_nets/{args.params_str}.pth',
-                monitor=f'val_{args.n_test}-shot_{args.k_test}-way_acc'
+                monitor=f'val_{args.eval_shot}-shot_{args.eval_way}-way_acc'
             ),
-            CSVLogger(osp.dirname(__file__) + f'/logs/proto_nets/{args.params_str}.csv'),
+            CSVLogger(osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/proto_nets/{args.params_str}.csv'),
         ]
         # LearningRateScheduler 最好直接在fit函数里面传一个lr_scheduler, 直接step吧. 看FEAT.
-        self.callbacks = CallbackList([DefaultCallback(), ] + (callbacks or []) + [ProgressBarLogger(), ])     
+        self.callbacks = CallbackList([DefaultCallback(metrics=self.metrics), ] 
+                                     + (callbacks or []) 
+                                     + [ProgressBarLogger(length=len(self.train_loader), metrics=self.metrics, verbose=self.verbose), ])
+
+    def batch_metrics(self, logits, y, batch_logs):
+        self.model.eval()
+        for m in self.metrics:
+            if isinstance(m, str):
+                batch_logs[m] = NAMED_METRICS[m](y, logits)
+            # else:
+            #     # Assume metric is a callable function
+            #     batch_logs = m(y, logits)
+
+        return batch_logs
+
 
     def fit_handle(self,
-                   data: torch.Tensor,
-                   label: torch.Tensor,
+                   x: torch.Tensor,
+                   y: torch.Tensor,
                    train: bool = True):
         if train:
             # Zero gradients
@@ -104,8 +125,8 @@ class Trainer(object):
         else:
             self.model.eval()
         
-        logits, reg_logits = self.model(data)
-        loss = self.loss_fn(logits, label)
+        logits, reg_logits = self.model(x)
+        loss = self.loss_fn(logits, y)
 
         if train:
             # Take gradient step
@@ -118,9 +139,8 @@ class Trainer(object):
         batch_size = self.train_loader.batch_size
 
         self.callbacks.set_model(self.model)
-        self.callbacks.set_params(self.params)
 
-        if self.params['verbose']:
+        if self.verbose:
             print('Begin training...')
 
         self.callbacks.on_train_begin()
@@ -128,7 +148,7 @@ class Trainer(object):
         # from torch.utils.tensorboard import SummaryWriter
         # writer = SummaryWriter('runs/model')
 
-        for epoch in range(1, self.params['max_epoch']+1):
+        for epoch in range(1, self.max_epoch+1):
             self.callbacks.on_epoch_begin(epoch)
             epoch_logs = {}
             for batch_index, batch in enumerate(self.train_loader):
@@ -136,13 +156,13 @@ class Trainer(object):
 
                 self.callbacks.on_batch_begin(batch_index, batch_logs)
 
-                x, y = self.params['prepare_batch'](batch)
+                x, y = self.prepare_batch(batch)
 
                 logits, reg_logits, loss = self.fit_handle(x, y)
                 batch_logs['loss'] = loss.item()
 
                 # Loops through all metrics
-                batch_logs = batch_metrics(model, y_pred, y, metrics, batch_logs)
+                batch_logs = self.batch_metrics(logits, y, batch_logs)
 
                 self.callbacks.on_batch_end(batch_index, batch_logs)
 
@@ -151,7 +171,7 @@ class Trainer(object):
             self.callbacks.on_epoch_end(epoch, epoch_logs)
 
         # Run on train end
-        if self.params['verbose']:
+        if self.verbose:
             print('Finished.')
 
         self.callbacks.on_train_end()

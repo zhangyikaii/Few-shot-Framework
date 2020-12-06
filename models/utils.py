@@ -5,7 +5,7 @@ import numpy as np
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from models.few_shot.proto import ProtoNet
+from models.few_shot.protonet import ProtoNet
 
 def mkdir(dir):
     """Create a directory, ignoring exceptions
@@ -14,7 +14,7 @@ def mkdir(dir):
         dir: Path of directory to create
     """
     try:
-        os.mkdir(dir)
+        os.makedirs(dir)
     except:
         pass
 
