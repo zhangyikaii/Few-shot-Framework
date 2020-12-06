@@ -93,3 +93,47 @@ class NShotTaskSampler(Sampler):
             #   也就是 (n) 个这样一组是 一类, 达到 (n * k) 之后 (q) 个这样一组是一类.
             # episodes_per_epoch 决定了有多少个这样的多task训练.
             yield np.stack(batch)
+
+def prepare_nshot_task(n: int, k: int, q: int) -> Callable:
+    """Typical n-shot task preprocessing.
+
+    # Arguments
+        n: Number of samples for each class in the n-shot classification task
+        k: Number of classes in the n-shot classification task
+        q: Number of query samples for each class in the n-shot classification task
+
+    # Returns
+        prepare_nshot_task_: A Callable that processes a few shot tasks with specified n, k and q
+    """
+    def prepare_nshot_task_(batch: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Create 0-k label and move to GPU.
+
+        TODO: Move to arbitrary device
+        """
+        x, y = batch
+        x = x.double().cuda()
+        # Create dummy 0-(num_classes - 1) label, 每个 q 个, 请看create_nshot_task_label函数.
+        y = create_nshot_task_label(k, q).cuda()
+        return x, y
+
+    return prepare_nshot_task_
+
+
+def create_nshot_task_label(k: int, q: int) -> torch.Tensor:
+    """Creates an n-shot task label.
+
+    Label has the structure:
+        [0]*q + [1]*q + ... + [k-1]*q
+
+    # Arguments
+        k: Number of classes in the n-shot classification task
+        q: Number of query samples for each class in the n-shot classification task
+
+    # Returns
+        y: Label vector for n-shot task of shape [q * k, ]
+    """
+
+    y = torch.arange(0, k, 1 / q).long() # 很精妙, 注意强转成long了.
+    # 返回从 0 ~ k - 1 (label), 每个元素有 q 个(query samples).
+    return y
+

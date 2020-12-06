@@ -30,6 +30,13 @@ class CallbackList(object):
         for callback in self.callbacks:
             callback.set_params(params)
 
+    def set_model(self, model):
+        for callback in self.callbacks:
+            # 每个对象设置到当前model.
+            # 真正要看是怎么set_model的, 包括下面的 callback.操作函数 , 都要进到具体的对象里面看.
+
+            callback.set_model(model)
+
     def on_epoch_begin(self, epoch, logs=None):
         """Called at the start of an epoch.
         # Arguments
@@ -93,9 +100,11 @@ class CallbackList(object):
 class Callback(object):
     def __init__(self):
         self.params = None
+        self.model = None
     def set_params(self, params):
         self.params = params
-
+    def set_model(self, model):
+        self.model = model
     def on_epoch_begin(self, epoch, logs=None):
         pass
 
@@ -197,7 +206,7 @@ class ProgressBarLogger(Callback):
         self.pbar.close()
 
 
-
+# 未改, 最好在 eval_fn 调用处要改一下.
 class EvaluateFewShot(Callback):
     """Evaluate a network on an n-shot, k-way classification tasks after every epoch.
 
@@ -214,15 +223,17 @@ class EvaluateFewShot(Callback):
     """
 
     def __init__(self,
+                 eval_fn: Callable,
                  num_tasks: int,
-                 k_way: int,
                  n_shot: int,
+                 k_way: int,
                  q_queries: int,
                  taskloader: torch.utils.data.DataLoader,
                  prepare_batch: Callable,
                  prefix: str = 'val_',
                  **kwargs):
         super(EvaluateFewShot, self).__init__()
+        self.eval_fn = eval_fn
         self.num_tasks = num_tasks
         self.n_shot = n_shot
         self.k_way = k_way
@@ -235,7 +246,7 @@ class EvaluateFewShot(Callback):
 
     def on_train_begin(self, logs=None):
         self.loss_fn = self.params['loss_fn']
-        self.optimizer = self.params['optimizer']
+        self.optimiser = self.params['optimiser']
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -254,9 +265,10 @@ class EvaluateFewShot(Callback):
             # 注意这里的传参逻辑一定要搞清楚.
             
             # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
+            # 就相当于forward.
             loss, y_pred = self.eval_fn(
                 self.model,
-                self.optimizer,
+                self.optimiser,
                 self.loss_fn,
                 x,
                 y,
@@ -278,4 +290,204 @@ class EvaluateFewShot(Callback):
         logs[self.metric_name] = totals[self.metric_name] / seen
 
 
+class ModelCheckpoint(Callback):
+    """Save the model after every epoch.
 
+    `filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
+    (passed in `on_epoch_end`).
+
+    For example: if `filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
+    with the epoch number and the validation loss in the filename.
+
+    # Arguments
+        filepath: string, path to save the model file.
+        monitor: quantity to monitor.
+        verbose: verbosity mode, 0 or 1.
+        save_best_only: if `save_best_only=True`,
+            the latest best model according to
+            the quantity monitored will not be overwritten.
+        mode: one of {auto, min, max}.
+            If `save_best_only=True`, the decision
+            to overwrite the current save file is made
+            based on either the maximization or the
+            minimization of the monitored quantity. For `val_acc`,
+            this should be `max`, for `val_loss` this should
+            be `min`, etc. In `auto` mode, the direction is
+            automatically inferred from the name of the monitored quantity.
+        save_weights_only: if True, then only the model's weights will be
+            saved (`model.save_weights(filepath)`), else the full model
+            is saved (`model.save(filepath)`).
+        period: Interval (number of epochs) between checkpoints.
+    """
+
+    def __init__(self, filepath, monitor='val_acc', verbose=True, save_best_only=True, mode='max', period=1):
+        super(ModelCheckpoint, self).__init__()
+        self.monitor = monitor
+        self.verbose = verbose
+        self.filepath = filepath
+        self.save_best_only = save_best_only
+        self.period = period
+        self.epochs_since_last_save = 0
+
+        if mode not in ['auto', 'min', 'max']:
+            raise ValueError('Mode must be one of (auto, min, max).')
+
+        if mode == 'min':
+            self.monitor_op = np.less
+            self.best = np.Inf
+        elif mode == 'max':
+            self.monitor_op = np.greater
+            self.best = -np.Inf
+        else:
+            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
+                self.monitor_op = np.greater
+                self.best = -np.Inf
+            else:
+                self.monitor_op = np.less
+
+        self.best = np.Inf
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        self.epochs_since_last_save += 1
+        if self.epochs_since_last_save >= self.period:
+            self.epochs_since_last_save = 0
+            # TODO: 这里的filepath没有嵌入epoch.
+            filepath = self.filepath.format(epoch=epoch + 1, **logs)
+            if self.save_best_only:
+                current = logs.get(self.monitor)
+                if current is None:
+                    warnings.warn('Can save best model only with %s available, '
+                                  'skipping.' % (self.monitor), RuntimeWarning)
+                else:
+                    if self.monitor_op(current, self.best):
+                        if self.verbose > 0:
+                            print('\nEpoch %05d: %s improved from %0.5f to %0.5f,'
+                                  ' saving model to %s'
+                                  % (epoch + 1, self.monitor, self.best,
+                                     current, filepath))
+                        self.best = current
+                        torch.save(self.model.state_dict(), filepath)
+                    else:
+                        if self.verbose > 0:
+                            print('\nEpoch %05d: %s did not improve from %0.5f' %
+                                  (epoch + 1, self.monitor, self.best))
+            else:
+                if self.verbose > 0:
+                    print('\nEpoch %05d: saving model to %s' % (epoch + 1, filepath))
+                torch.save(self.model.state_dict(), filepath)
+
+
+class CSVLogger(Callback):
+    """Callback that streams epoch results to a csv file.
+    Supports all values that can be represented as a string,
+    including 1D iterables such as np.ndarray.
+
+    # Arguments
+        filename: filename of the csv file, e.g. 'run/log.csv'.
+        separator: string used to separate elements in the csv file.
+        append: True: append if file exists (useful for continuing
+            training). False: overwrite existing file,
+    """
+
+    def __init__(self, filename, separator=',', append=False):
+        self.sep = separator
+        self.filename = filename
+        self.append = append
+        self.writer = None
+        self.keys = None
+        self.append_header = True
+        self.file_flags = ''
+        self._open_args = {'newline': '\n'}
+        super(CSVLogger, self).__init__()
+
+    def on_train_begin(self, logs=None):
+        if self.append:
+            if os.path.exists(self.filename):
+                with open(self.filename, 'r' + self.file_flags) as f:
+                    self.append_header = not bool(len(f.readline()))
+            mode = 'a'
+        else:
+            mode = 'w'
+
+        self.csv_file = io.open(self.filename,
+                                mode + self.file_flags,
+                                **self._open_args)
+
+    # 在这里将各种参数写入文件.
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+
+        def handle_value(k):
+            is_zero_dim_ndarray = isinstance(k, np.ndarray) and k.ndim == 0
+            if isinstance(k, str):
+                return k
+            elif isinstance(k, Iterable) and not is_zero_dim_ndarray:
+                return '"[%s]"' % (', '.join(map(str, k)))
+            else:
+                return k
+
+        if self.keys is None:
+            self.keys = sorted(logs.keys())
+
+        if not self.writer:
+            class CustomDialect(csv.excel):
+                delimiter = self.sep
+            fieldnames = ['epoch'] + self.keys
+            self.writer = csv.DictWriter(self.csv_file,
+                                         fieldnames=fieldnames,
+                                         dialect=CustomDialect)
+            if self.append_header:
+                self.writer.writeheader()
+
+        row_dict = OrderedDict({'epoch': epoch})
+        row_dict.update((key, handle_value(logs[key])) for key in self.keys)
+        # row_dict 就是 csv 文件里记录的信息.
+        self.writer.writerow(row_dict)
+        self.csv_file.flush()
+
+    def on_train_end(self, logs=None):
+        self.csv_file.close()
+        self.writer = None
+
+
+class LearningRateScheduler(Callback):
+    """Learning rate scheduler.
+    # Arguments
+        schedule: a function that takes an epoch index as input
+            (integer, indexed from 0) and current learning rate
+            and returns a new learning rate as output (float).
+        verbose: int. 0: quiet, 1: update messages.
+    """
+
+    def __init__(self, schedule, verbose=True):
+        super(LearningRateScheduler, self).__init__()
+        self.schedule = schedule
+        self.verbose = verbose
+
+    def on_train_begin(self, logs=None):
+        self.optimiser = self.params['optimiser']
+
+    def on_epoch_begin(self, epoch, logs=None):
+        lrs = [self.schedule(epoch, param_group['lr']) for param_group in self.optimiser.param_groups]
+
+        if not all(isinstance(lr, (float, np.float32, np.float64)) for lr in lrs):
+            raise ValueError('The output of the "schedule" function '
+                             'should be float.')
+        self.set_lr(epoch, lrs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        if len(self.optimiser.param_groups) == 1:
+            logs['lr'] = self.optimiser.param_groups[0]['lr']
+        else:
+            for i, param_group in enumerate(self.optimiser.param_groups):
+                logs['lr_{}'.format(i)] = param_group['lr']
+
+    def set_lr(self, epoch, lrs):
+        for i, param_group in enumerate(self.optimiser.param_groups):
+            new_lr = lrs[i]
+            param_group['lr'] = new_lr
+            if self.verbose:
+                print('Epoch {:5d}: setting learning rate'
+                      ' of group {} to {:.4e}.'.format(epoch, i, new_lr))

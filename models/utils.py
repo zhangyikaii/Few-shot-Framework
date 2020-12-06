@@ -74,7 +74,7 @@ def get_command_line_parser():
     parser.add_argument('--step_size', type=str, default='20')
     parser.add_argument('--gamma', type=float, default=0.2)    
     parser.add_argument('--fix_BN', action='store_true', default=False)     # means we do not update the running mean/var in BN, not to freeze BN
-    parser.add_argument('--augment',   action='store_true', default=False)
+    parser.add_argument('--augment', action='store_true', default=False)
     parser.add_argument('--multi_gpu', action='store_true', default=False)
     parser.add_argument('--gpu', default='0')
     parser.add_argument('--init_weights', type=str, default=None)
@@ -86,6 +86,8 @@ def get_command_line_parser():
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--eval_interval', type=int, default=1)
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
+    
+    parser.add_argument('--verbose', action='store_true', default=False)
     
     return parser
 
@@ -124,7 +126,7 @@ def preprocess_args(args):
     elif args.dataset == 'MiniImageNet':
         args.num_input_channels = 3
     
-    args.parm_str = f'{args.dataset}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
+    args.params_str = f'{args.dataset}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
             f'{args.query}-query_{args.eval_query}_eval_query'
     return args
 

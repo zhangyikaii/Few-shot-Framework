@@ -1,5 +1,10 @@
+from models.few_shot.base import FewShotModel
+import torch
+import torch.nn as nn
+import numpy as np
+import torch.nn.functional as F
 
-class ProtoNet():
+class ProtoNet(FewShotModel):
     def __init__(self, args):
         super().__init__(args)
 
