@@ -45,12 +45,8 @@ class FewShotModel(nn.Module):
             num_inst = instance_embs.shape[0]
             # split support query set for few-shot data
             support_idx, query_idx = self.split_instances(x)
-            if self.training:
-                logits, logits_reg = self._forward(instance_embs, support_idx, query_idx)
-                return logits, logits_reg
-            else:
-                logits = self._forward(instance_embs, support_idx, query_idx)
-                return logits
+            logits, logits_reg = self._forward(instance_embs, support_idx, query_idx)
+            return logits, logits_reg
 
     def _forward(self, x, support_idx, query_idx):
         raise NotImplementedError('Suppose to be implemented by subclass')

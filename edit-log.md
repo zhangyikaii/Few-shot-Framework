@@ -79,6 +79,10 @@ models.py 里面的encoder()就是backbone.
 
 3. model & data: float32 or float64.
 
+4. `fix_BN` ?
+
+5. `reg_logits` ?
+
 
 ## Few-shot-Framework
 
@@ -93,3 +97,9 @@ models.py 里面的encoder()就是backbone.
 + 期望的结果是增加模型后不用改动太多的文件, 即不同该`utils.py`文件
 
 + TODO: 在迭代内, progress bar 没有被更新, 是self.length那里出错吗?
+
++ 在forward函数内出错, 报错只会报: `= self.model(x)` 出错, 不会具体某一行.
+
++ `ValueError: too many values to unpack (expected 2)` 可能是返回了两个参数, 实际上接收那边只有一个.
+
++ 在 `nn` 模型内, 随着`model.eval()`, `self.traing` 在变化.

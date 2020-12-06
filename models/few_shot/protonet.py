@@ -37,7 +37,4 @@ class ProtoNet(FewShotModel):
             logits = torch.bmm(query, proto.permute([0,2,1])) / self.args.temperature
             logits = logits.view(-1, num_proto)
 
-        if self.training:
-            return logits, None
-        else:
-            return logits
+        return logits, None

@@ -89,11 +89,12 @@ class Trainer(object):
                 prepare_batch=self.prepare_batch,
                 loss_fn=self.loss_fn,
                 optimizer=self.optimizer,
-                distance=args.distance
+                verbose=self.verbose
             ),
             ModelCheckpoint(
                 filepath=f'/mnt/data3/lus/zhangyk/models/proto_nets/{args.params_str}.pth',
-                monitor=f'val_{args.eval_shot}-shot_{args.eval_way}-way_acc'
+                monitor=f'val_{args.eval_shot}-shot_{args.eval_way}-way_acc',
+                verbose=self.verbose
             ),
             CSVLogger(osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/proto_nets/{args.params_str}.csv'),
         ]

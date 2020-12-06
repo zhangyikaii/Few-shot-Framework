@@ -127,7 +127,7 @@ def preprocess_args(args):
         args.num_input_channels = 3
     
     args.params_str = f'{args.dataset}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
-            f'{args.query}-query_{args.eval_query}_eval_query'
+            f'{args.query}-query_{args.eval_query}_eval-query'
     return args
 
 

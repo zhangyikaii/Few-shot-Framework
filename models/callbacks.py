@@ -227,6 +227,7 @@ class EvaluateFewShot(Callback):
                  prepare_batch: Callable,
                  loss_fn: Callable,
                  optimizer: Callable,
+                 verbose: bool = True,
                  prefix: str = 'val_',
                  **kwargs):
         super(EvaluateFewShot, self).__init__()
@@ -242,6 +243,7 @@ class EvaluateFewShot(Callback):
         self.metric_name = f'{self.prefix}{self.n_shot}-shot_{self.k_way}-way_acc'
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.verbose = verbose
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -261,21 +263,24 @@ class EvaluateFewShot(Callback):
             
             # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
             # 就相当于forward.
-            loss, y_pred = self.eval_fn(
+            
+            logits, reg_logits, loss = self.eval_fn(
                 x,
                 y,
                 train=False
             )
 
-            seen += y_pred.shape[0]
+            seen += logits.shape[0]
 
-            totals['loss'] += loss.item() * y_pred.shape[0]
-            totals[self.metric_name] += categorical_accuracy(y, y_pred) * y_pred.shape[0]
+            totals['loss'] += loss.item() * logits.shape[0]
+            totals[self.metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
 
         logs[self.prefix + 'loss'] = totals['loss'] / seen
 
         # 注意! 最后的测试准确率就在这里了, 这是在validation上的!
         logs[self.metric_name] = totals[self.metric_name] / seen
+        if self.verbose:
+            pass # TODO: 这里输出一下, 一个epoch也结束了, 输出一下validation的结果.
 
 
 class ModelCheckpoint(Callback):
