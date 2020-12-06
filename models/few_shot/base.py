@@ -34,7 +34,6 @@ class FewShotModel(nn.Module):
             return  (torch.Tensor(np.arange(args.eval_way*args.eval_shot)).long().view(1, args.eval_shot, args.eval_way), 
                      torch.Tensor(np.arange(args.eval_way*args.eval_shot, args.eval_way * (args.eval_shot + args.eval_query))).long().view(1, args.eval_query, args.eval_way))
 
-
     def forward(self, x, get_feature=False):
         if get_feature:
             # get feature with the provided embeddings

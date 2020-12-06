@@ -14,5 +14,6 @@ python ../main.py \
     --lr 0.0001 --lr_mul 10 --lr_scheduler step \
     --step_size 20 \
     --gamma 0.5 \
-    --eval_interval 1
+    --eval_interval 1 \
+    --verbose
     # --init_weights ./saves/initialization/miniimagenet/con-pre.pth
