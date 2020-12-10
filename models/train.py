@@ -89,7 +89,7 @@ class Trainer(object):
             metric_name=self.metric_name,
             eval_fn=self.fit_handle,
             verbose=self.verbose,
-            simulation_test=True
+            simulation_test=False
         )
         
         callbacks = [
@@ -102,7 +102,7 @@ class Trainer(object):
                 verbose=self.verbose
             ),
             CSVLogger(
-                osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/{args.model_class}/{args.params_str}.csv',
+                osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/result/{args.params_str}.csv',
                 separator=',',
                 append=False
             )
@@ -149,16 +149,18 @@ class Trainer(object):
 
     def test(self):
         self.model.load_state_dict(torch.load(self.model_filepath))
+        self.logger.info(f'Testing model: {self.model_filepath}')
         self.evaluate_handle.predict_log(self.max_epoch, self.test_loader, 'test_')
 
     def fit(self):
         # Determine number of samples:
         batch_size = self.train_loader.batch_size
 
-        self.callbacks.set_model(self.model)
+        self.callbacks.set_model(self.model, self.logger)
 
         if self.verbose:
-            print('Begin training...')
+            # print('Begin training...')
+            self.logger.info('Begin training...')
 
         self.callbacks.on_train_begin()
         
@@ -188,7 +190,8 @@ class Trainer(object):
 
         # Run on train end
         if self.verbose:
-            print('Finished.')
+            # print('Finished.')
+            self.logger.info('Finished')
 
         self.callbacks.on_train_end()
 

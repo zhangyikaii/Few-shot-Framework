@@ -29,12 +29,12 @@ class CallbackList(object):
     def __init__(self, callbacks):
         self.callbacks = [c for c in callbacks]
 
-    def set_model(self, model):
+    def set_model(self, model, logger):
         for callback in self.callbacks:
             # 每个对象设置到当前model.
             # 真正要看是怎么set_model的, 包括下面的 callback.操作函数 , 都要进到具体的对象里面看.
 
-            callback.set_model(model)
+            callback.set_model(model, logger)
 
     def on_epoch_begin(self, epoch, logs=None):
         """Called at the start of an epoch.
@@ -93,8 +93,10 @@ class CallbackList(object):
 class Callback(object):
     def __init__(self):
         self.model = None
-    def set_model(self, model):
+        self.logger = None
+    def set_model(self, model, logger):
         self.model = model
+        self.logger = logger
     def on_epoch_begin(self, epoch, logs=None):
         pass
 
@@ -202,6 +204,9 @@ class EvaluateFewShot(Callback):
         self.verbose = verbose
         self.simulation_test = simulation_test
 
+    def on_epoch_begin(self, epoch, logs=None):
+        self.logger.info(f'Epoch %d:' % (epoch))
+
     def predict_log(self, epoch, dataloader, prefix, logs=None):
         seen = 0
         metric_name = prefix + self.metric_name
@@ -239,9 +244,10 @@ class EvaluateFewShot(Callback):
             logs[metric_name] = totals[metric_name]
         if self.verbose:
             # TODO: 这里输出一下, 一个epoch也结束了, 输出一下validation的结果.
-            print()
-            print(prefix + 'loss: %f, ' % totals['loss'] + metric_name + ': %f.' % totals[metric_name])
-
+            # print()
+            # print(prefix + 'loss: %f, ' % totals['loss'] + metric_name + ': %f.' % totals[metric_name])
+            self.logger.info(prefix + 'loss: %f, ' % totals['loss'] 
+                + metric_name + ': %f.' % totals[metric_name])
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -310,6 +316,7 @@ class ModelCheckpoint(Callback):
             if self.monitor_op(test_current, self.test_best):
                 if not self.monitor_op(val_current, self.val_best):
                     warnings.warn('测试更好, 但是验证更菜.', RuntimeWarning)
+                    self.logger.warning('测试更好, 但是验证更菜.')
                 return True
         else:
             return self.monitor_op(val_current, self.val_best)
@@ -322,7 +329,8 @@ class ModelCheckpoint(Callback):
 
         if self.judge_monitor(logs):
             if self.verbose > 0:
-                print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+                # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+                self.logger.info('Saving model.')
             self.val_best, self.test_best = logs.get(self.val_monitor), logs.get(self.test_monitor)
             torch.save(self.model.state_dict(), self.model_filepath)
 
@@ -387,10 +395,12 @@ class CSVLogger(Callback):
                 self.writer.writeheader()
 
         row_dict = OrderedDict({'epoch': epoch})
-        print("KKKKKK")
-        print(logs)
+
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         # row_dict 就是 csv 文件里记录的信息.
+        self.logger.info(
+            [f'{k}: {dict1[k]}' for k in dict1.keys()]
+        )
         self.writer.writerow(row_dict)
         self.csv_file.flush()
 

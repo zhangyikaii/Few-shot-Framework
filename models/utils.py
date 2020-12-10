@@ -102,6 +102,8 @@ def set_logger(args, logger_name):
     import logging
     logging.basicConfig(
         filename=osp.abspath(osp.dirname(osp.dirname(__file__))) + f'{args.logger_filepath}/{args.params_str}.log',
+        filemode='w',
+        level=logging.DEBUG,
         format='%(asctime)s %(message)s',
         datefmt='%m/%d/%Y %I:%M:%S %p'
     )
@@ -136,11 +138,14 @@ def preprocess_args(args):
     elif args.dataset == 'MiniImageNet':
         args.num_input_channels = 3
     
-    args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
-            f'{args.query}-query_{args.eval_query}-eval-query'
+    from time import gmtime, strftime
+    time_str = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
+
+    args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}' \
+            f'_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
+            f'{args.query}-query_{args.eval_query}-eval-query_{time_str}'
     
     return args
-
 
 class PrepareFunc(object):
     def __init__(self, args):
