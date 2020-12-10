@@ -103,3 +103,5 @@ models.py 里面的encoder()就是backbone.
 + `ValueError: too many values to unpack (expected 2)` 可能是返回了两个参数, 实际上接收那边只有一个.
 
 + 在 `nn` 模型内, 随着`model.eval()`, `self.traing` 在变化.
+
++ TODO: 注意在 `Dataloader` 那里不要分割support和query.

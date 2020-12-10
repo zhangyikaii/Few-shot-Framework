@@ -3,17 +3,52 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+from models.metrics import pairwise_distances
 
 class ProtoNet(FewShotModel):
     def __init__(self, args):
         super().__init__(args)
 
-    def _forward(self, instance_embs, support_idx, query_idx):
+    @staticmethod
+    def compute_prototypes(self, support: torch.Tensor, k: int, n: int) -> torch.Tensor:
+        """Compute class prototypes from support samples.
+
+        # Arguments
+            support: torch.Tensor. Tensor of shape (n * k, d) where d is the embedding
+                dimension.
+            k: int. "k-way" i.e. number of classes in the classification task
+            n: int. "n-shot" of the classification task
+
+        # Returns
+            class_prototypes: Prototypes aka mean embeddings for each class
+        """
+        # Reshape so the first dimension indexes by class then take the mean
+        # along that dimension to generate the "prototypes" for each class
+        class_prototypes = support.reshape(k, n, -1).mean(dim=1)
+        return class_prototypes
+
+    def _forward(self, support, query):
+        prototypes = self.compute_prototypes(self, support, self.args.way, self.args.shot)
+
+        # Calculate squared distances between all queries and all prototypes
+        # Output should have shape (q_queries * k_way, k_way) = (num_queries, k_way)
+        distances = pairwise_distances(query, prototypes, self.args.distance)
+
+        # Prediction probabilities are softmax over distances
+        logits = (-distances).softmax(dim=1)
+
+        return logits, None
+
+    def _forward_FEAT(self, instance_embs, support_idx, query_idx):
         emb_dim = instance_embs.size(-1)
 
         # organize support/query data
+        # 根据下标把support取出来.
+        # view后面是 [1 x n-shot x k-way], 就按照这样的 n-shot, k-way 取出了, 因为前面flatten之后就是没结构的规整的形式了.
+        # 很精妙! 因为这样可以保留feature结构.
         support = instance_embs[support_idx.flatten()].view(*(support_idx.shape + (-1,)))
         query   = instance_embs[query_idx.flatten()].view(  *(query_idx.shape   + (-1,)))
+        # support: [1 x n-shot x k-way x feature num]
 
         # get mean of the support
         proto = support.mean(dim=1) # Ntask x NK x d

@@ -1,4 +1,5 @@
 import os, shutil
+import os.path as osp
 import torch
 import torch.nn as nn
 import numpy as np
@@ -61,6 +62,7 @@ def get_command_line_parser():
     parser.add_argument('--drop_lr_every', type=int, default=40)
     parser.add_argument('--model_class', type=str, default='ProtoNet', 
                         choices=['MatchNet', 'ProtoNet', 'BILSTM', 'DeepSet', 'GCN', 'FEAT', 'FEATSTAR', 'SemiFEAT', 'SemiProtoFEAT']) # None for MatchNet or ProtoNet   
+    parser.add_argument('--logger_filepath', type=str)
 
     parser.add_argument('--balance', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=1)
@@ -96,6 +98,14 @@ _utils_pp = pprint.PrettyPrinter()
 def pprint(x):
     _utils_pp.pprint(x)
 
+def set_logger(args, logger_name):
+    import logging
+    logging.basicConfig(
+        filename=osp.abspath(osp.dirname(osp.dirname(__file__))) + f'{args.logger_filepath}/{args.params_str}.log',
+        format='%(asctime)s %(message)s',
+        datefmt='%m/%d/%Y %I:%M:%S %p'
+    )
+    return logging.getLogger(logger_name)
 
 def set_gpu(x):
     os.environ['CUDA_VISIBLE_DEVICES'] = x
@@ -126,8 +136,9 @@ def preprocess_args(args):
     elif args.dataset == 'MiniImageNet':
         args.num_input_channels = 3
     
-    args.params_str = f'{args.dataset}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
-            f'{args.query}-query_{args.eval_query}_eval-query'
+    args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
+            f'{args.query}-query_{args.eval_query}-eval-query'
+    
     return args
 
 

@@ -42,7 +42,6 @@ class CallbackList(object):
             epoch: integer, index of epoch.
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_epoch_begin(epoch, logs)
 
@@ -52,7 +51,6 @@ class CallbackList(object):
             epoch: integer, index of epoch.
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_epoch_end(epoch, logs)
 
@@ -62,7 +60,6 @@ class CallbackList(object):
             batch: integer, index of batch within the current epoch.
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_batch_begin(batch, logs)
 
@@ -72,7 +69,6 @@ class CallbackList(object):
             batch: integer, index of batch within the current epoch.
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_batch_end(batch, logs)
 
@@ -81,7 +77,6 @@ class CallbackList(object):
         # Arguments
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_train_begin(logs)
 
@@ -90,7 +85,6 @@ class CallbackList(object):
         # Arguments
             logs: dictionary of logs.
         """
-        logs = logs or {}
         for callback in self.callbacks:
             callback.on_train_end(logs)
 
@@ -148,56 +142,30 @@ class DefaultCallback(Callback):
                     # Make value available to next callbacks.
                     logs[k] = self.totals[k] / self.seen
 
-
 class ProgressBarLogger(Callback):
     """TQDM progress bar that displays the running average of loss and other metrics."""
-    def __init__(self, length, metrics, verbose=True):
+    def __init__(self, length, verbose=True):
         super(ProgressBarLogger, self).__init__()
         import torchvision
         self.length = length
         self.verbose = verbose
-        self.metrics = metrics
     
     def on_epoch_begin(self, epoch, logs=None):
         self.pbar = tqdm(total=self.length, desc='Epoch {}'.format(epoch))
         
         # TensorBoard Test:
-        from torch.utils.tensorboard import SummaryWriter
-        self.writer = SummaryWriter('runs/epoch-' + str(epoch))
+        # from torch.utils.tensorboard import SummaryWriter
+        # self.writer = SummaryWriter('runs/epoch-' + str(epoch))
         self.seen = 0
-
-    def on_batch_begin(self, batch, logs=None):
-        self.log_values = {}
-
-    def on_batch_end(self, batch, logs=None):
-        logs = logs or {}
-        self.seen += 1
-
-        for k in self.metrics:
-            if k in logs:
-                self.log_values[k] = logs[k]
-
-        # Skip progbar update for the last batch;
-        # will be handled by on_epoch_end.
         
-        self.writer.add_scalar('Loss/train', self.log_values['loss'], self.seen)
-        self.writer.add_scalar('Categorical Accuracy/train', self.log_values['categorical_accuracy'], self.seen)
-
-        if self.verbose and self.seen < self.length:
-            self.pbar.update(1)
-            self.pbar.set_postfix(self.log_values)
-
-    def on_epoch_end(self, epoch, logs=None):
-        # Update log values
-        self.log_values = {}
-        for k in self.metrics:
-            if k in logs:
-                self.log_values[k] = logs[k]
+    def on_batch_end(self, batch, logs=None):
+        self.seen += 1
 
         if self.verbose:
             self.pbar.update(1)
-            self.pbar.set_postfix(self.log_values)
+            self.pbar.set_postfix(logs)
 
+    def on_epoch_end(self, epoch, logs=None):
         self.pbar.close()
 
 
@@ -218,39 +186,28 @@ class EvaluateFewShot(Callback):
     """
 
     def __init__(self,
-                 eval_fn: Callable,
-                 num_tasks: int,
-                 n_shot: int,
-                 k_way: int,
-                 q_queries: int,
-                 taskloader: torch.utils.data.DataLoader,
+                 val_loader: torch.utils.data.DataLoader,
+                 test_loader: torch.utils.data.DataLoader,
                  prepare_batch: Callable,
-                 loss_fn: Callable,
-                 optimizer: Callable,
+                 eval_fn: Callable,
+                 metric_name: str,
                  verbose: bool = True,
-                 prefix: str = 'val_',
-                 **kwargs):
+                 simulation_test: bool = False):
         super(EvaluateFewShot, self).__init__()
-        self.eval_fn = eval_fn
-        self.num_tasks = num_tasks
-        self.n_shot = n_shot
-        self.k_way = k_way
-        self.q_queries = q_queries
-        self.taskloader = taskloader
+        self.val_loader = val_loader
+        self.test_loader = test_loader
         self.prepare_batch = prepare_batch
-        self.prefix = prefix
-        self.kwargs = kwargs
-        self.metric_name = f'{self.prefix}{self.n_shot}-shot_{self.k_way}-way_acc'
-        self.loss_fn = loss_fn
-        self.optimizer = optimizer
+        self.eval_fn = eval_fn
+        self.metric_name = metric_name
         self.verbose = verbose
+        self.simulation_test = simulation_test
 
-    # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
-    def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
+    def predict_log(self, epoch, dataloader, prefix, logs=None):
         seen = 0
-        totals = {'loss': 0, self.metric_name: 0}
-        for batch_index, batch in enumerate(self.taskloader):
+        metric_name = prefix + self.metric_name
+        totals = {'loss': 0, metric_name: 0}
+        # 这里开始做epoch_end的val:
+        for batch_index, batch in enumerate(tqdm(dataloader)):
             x, y = self.prepare_batch(batch)
 
             # 这里eval_fn就是该类(在callbacks(list))初始化时传进来的函数, 在/few_shot/下. \
@@ -263,37 +220,49 @@ class EvaluateFewShot(Callback):
             
             # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
             # 就相当于forward.
-            
+
             logits, reg_logits, loss = self.eval_fn(
                 x,
                 y,
                 train=False
             )
-
             seen += logits.shape[0]
 
             totals['loss'] += loss.item() * logits.shape[0]
-            totals[self.metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
+            totals[metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
 
-        logs[self.prefix + 'loss'] = totals['loss'] / seen
-
-        # 注意! 最后的测试准确率就在这里了, 这是在validation上的!
-        logs[self.metric_name] = totals[self.metric_name] / seen
+        totals['loss'] /= seen
+        totals[metric_name] /= seen
+        if logs != None:
+            logs[prefix + 'loss'] = totals['loss']
+            # 注意! 最后的测试准确率就在这里了, 这是在validation上的!
+            logs[metric_name] = totals[metric_name]
         if self.verbose:
-            pass # TODO: 这里输出一下, 一个epoch也结束了, 输出一下validation的结果.
+            # TODO: 这里输出一下, 一个epoch也结束了, 输出一下validation的结果.
+            print()
+            print(prefix + 'loss: %f, ' % totals['loss'] + metric_name + ': %f.' % totals[metric_name])
+
+
+    # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
+    def on_epoch_end(self, epoch, logs=None):
+        self.predict_log(epoch, self.val_loader, 'val_', logs)
+        if self.simulation_test:
+            self.predict_log(epoch, self.test_loader, 'test_', logs)
+
+    # TODO: 期望logs是记录了所有结果的.
 
 
 class ModelCheckpoint(Callback):
     """Save the model after every epoch.
 
-    `filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
+    `model_filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
     (passed in `on_epoch_end`).
 
-    For example: if `filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
+    For example: if `model_filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
     with the epoch number and the validation loss in the filename.
 
     # Arguments
-        filepath: string, path to save the model file.
+        model_filepath: string, path to save the model file.
         monitor: quantity to monitor.
         verbose: verbosity mode, 0 or 1.
         save_best_only: if `save_best_only=True`,
@@ -308,68 +277,54 @@ class ModelCheckpoint(Callback):
             be `min`, etc. In `auto` mode, the direction is
             automatically inferred from the name of the monitored quantity.
         save_weights_only: if True, then only the model's weights will be
-            saved (`model.save_weights(filepath)`), else the full model
-            is saved (`model.save(filepath)`).
+            saved (`model.save_weights(model_filepath)`), else the full model
+            is saved (`model.save(model_filepath)`).
         period: Interval (number of epochs) between checkpoints.
     """
 
-    def __init__(self, filepath, monitor='val_acc', verbose=True, save_best_only=True, mode='auto', period=1):
+    def __init__(self, model_filepath, monitor, save_best_only=True, mode='max', verbose=True):
         super(ModelCheckpoint, self).__init__()
-        self.monitor = monitor
-        self.verbose = verbose
-        self.filepath = filepath
+        self.model_filepath = model_filepath
+        self.val_monitor = 'val_' + monitor
+        self.test_monitor = 'test_' + monitor
         self.save_best_only = save_best_only
-        self.period = period
-        self.epochs_since_last_save = 0
+        self.verbose = verbose
 
-        if mode not in ['auto', 'min', 'max']:
-            raise ValueError('Mode must be one of (auto, min, max).')
+        if mode not in ['min', 'max']:
+            raise ValueError('Mode must be one of (min, max).')
+
+        self.val_best, self.test_best = None, None
 
         if mode == 'min':
             self.monitor_op = np.less
-            self.best = np.Inf
         elif mode == 'max':
             self.monitor_op = np.greater
-            self.best = -np.Inf
+    
+    def judge_monitor(self, logs):
+        if self.val_best == None:
+            return True
+
+        val_current = logs.get(self.val_monitor)
+        if self.test_monitor in logs.keys():
+            test_current = logs.get(self.test_monitor)
+            if self.monitor_op(test_current, self.test_best):
+                if not self.monitor_op(val_current, self.val_best):
+                    warnings.warn('测试更好, 但是验证更菜.', RuntimeWarning)
+                return True
         else:
-            if 'acc' in self.monitor or self.monitor.startswith('fmeasure'):
-                self.monitor_op = np.greater
-                self.best = -np.Inf
-            else:
-                self.monitor_op = np.less
+            return self.monitor_op(val_current, self.val_best)
 
-        self.best = np.Inf
-
+        
     def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-        self.epochs_since_last_save += 1
-        if self.epochs_since_last_save >= self.period:
-            self.epochs_since_last_save = 0
-            # TODO: 这里的filepath没有嵌入epoch.
-            filepath = self.filepath.format(epoch=epoch + 1, **logs)
-            if self.save_best_only:
-                current = logs.get(self.monitor)
-                if current is None:
-                    warnings.warn('Can save best model only with %s available, '
-                                  'skipping.' % (self.monitor), RuntimeWarning)
-                else:
-                    if self.monitor_op(current, self.best):
-                        if self.verbose > 0:
-                            print('\nEpoch %05d: %s improved from %0.5f to %0.5f,'
-                                  ' saving model to %s'
-                                  % (epoch + 1, self.monitor, self.best,
-                                     current, filepath))
-                        self.best = current
-                        torch.save(self.model.state_dict(), filepath)
-                    else:
-                        if self.verbose > 0:
-                            print('\nEpoch %05d: %s did not improve from %0.5f' %
-                                  (epoch + 1, self.monitor, self.best))
-            else:
-                if self.verbose > 0:
-                    print('\nEpoch %05d: saving model to %s' % (epoch + 1, filepath))
-                torch.save(self.model.state_dict(), filepath)
+        # TODO: 这里的model_filepath没有嵌入epoch.
+        # model_filepath = self.model_filepath.format(epoch=epoch + 1, **logs)
+        # 为了保证传进来__init__的model_filepath就是最优模型的, 这里不改变model_filepath.
 
+        if self.judge_monitor(logs):
+            if self.verbose > 0:
+                print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+            self.val_best, self.test_best = logs.get(self.val_monitor), logs.get(self.test_monitor)
+            torch.save(self.model.state_dict(), self.model_filepath)
 
 class CSVLogger(Callback):
     """Callback that streams epoch results to a csv file.
@@ -409,8 +364,6 @@ class CSVLogger(Callback):
 
     # 在这里将各种参数写入文件.
     def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
-
         def handle_value(k):
             is_zero_dim_ndarray = isinstance(k, np.ndarray) and k.ndim == 0
             if isinstance(k, str):
@@ -434,6 +387,8 @@ class CSVLogger(Callback):
                 self.writer.writeheader()
 
         row_dict = OrderedDict({'epoch': epoch})
+        print("KKKKKK")
+        print(logs)
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         # row_dict 就是 csv 文件里记录的信息.
         self.writer.writerow(row_dict)

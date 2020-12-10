@@ -23,6 +23,38 @@ IMAGE_PATH = osp.join(DATA_PATH, 'mini_imagenet/images')
 SPLIT_PATH = osp.join(ROOT_PATH, 'data/mini_imagenet/split')
 CACHE_PATH = osp.join(ROOT_PATH, '.cache/')
 
+
+# for test
+class DummyDataset(Dataset):
+    def __init__(self, samples_per_class=10, n_classes=10, n_features=1):
+        """Dummy dataset for debugging/testing purposes
+
+        A sample from the DummyDataset has (n_features + 1) features. The first feature is the index of the sample
+        in the data and the remaining features are the class index.
+
+        # Arguments
+            samples_per_class: Number of samples per class in the dataset
+            n_classes: Number of distinct classes in the dataset
+            n_features: Number of extra features each sample should have.
+        """
+        self.samples_per_class = samples_per_class
+        self.n_classes = n_classes
+        self.n_features = n_features
+
+        # Create a dataframe to be consistent with other Datasets
+        self.df = pd.DataFrame({
+            'class_id': [i % self.n_classes for i in range(len(self))]
+        })
+        self.df = self.df.assign(id=self.df.index.values)
+
+    def __len__(self):
+        return self.samples_per_class * self.n_classes
+
+    def __getitem__(self, item):
+        class_id = item % self.n_classes
+        return np.array([item] + [class_id]*self.n_features, dtype=np.float), float(class_id)
+
+
 class MiniImageNet(Dataset):
     def __init__(self, stype, args):
         """Dataset class representing miniImageNet dataset

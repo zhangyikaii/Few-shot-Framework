@@ -20,3 +20,4 @@ if __name__ == '__main__':
     """
     trainer = Trainer(args)
     trainer.fit()
+    trainer.test()
