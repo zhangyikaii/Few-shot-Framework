@@ -32,7 +32,7 @@ class ProtoNet(FewShotModel):
 
         # Calculate squared distances between all queries and all prototypes
         # Output should have shape (q_queries * k_way, k_way) = (num_queries, k_way)
-        distances = pairwise_distances(query, prototypes, self.args.distance)
+        distances = pairwise_distances(query, prototypes, self.args.distance, self.args.temperature)
 
         # Prediction probabilities are softmax over distances
         logits = (-distances).softmax(dim=1)

@@ -182,18 +182,18 @@ class MiniImageNet(Dataset):
 
 
 def get_dataloader(args):
-    def taskloader(stype, args):
+    def taskloader(stype, args, shot, way, query):
         dataset = eval(args.dataset)(stype, args)
         taskloader = DataLoader(
             dataset,
-            batch_sampler=NShotTaskSampler(dataset, args.episodes_per_epoch, args.shot, args.way, args.query),
+            batch_sampler=NShotTaskSampler(dataset, args.episodes_per_epoch, shot, way, query),
             num_workers=4
         )
         return taskloader
 
-    train_taskloader, val_taskloader, test_taskloader = taskloader('train', args), \
-        taskloader('val', args), \
-        taskloader('test', args)
+    train_taskloader, val_taskloader, test_taskloader = taskloader('train', args, args.shot, args.way, args.query), \
+        taskloader('val', args, args.shot, args.way, args.query), \
+        taskloader('test', args, args.eval_shot, args.eval_way, args.eval_query)
 
     # return {'train': train_taskloader, 'val': val_taskloader, 'test': test_taskloader}
     return train_taskloader, val_taskloader, test_taskloader

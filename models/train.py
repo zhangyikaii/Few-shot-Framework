@@ -17,8 +17,8 @@ from models.callbacks import (
 )
 
 from models.dataloader.mini_imagenet import get_dataloader
-from models.utils import PrepareFunc, set_logger
-from models.sampler import prepare_nshot_task
+from models.few_shot.helper import PrepareFunc
+from models.utils import set_logger
 
 from models.metrics import (
     NAMED_METRICS,
@@ -59,13 +59,13 @@ class Trainer(object):
         # ( model 有且仅有这一个, callbacks 基类派生类都是共享这一个model. 下面其他东西也是这样存储 )
         self.model, self.para_model = prepare_handle.prepare_model()
         self.optimizer, self.lr_scheduler = prepare_handle.prepare_optimizer(self.model)
-        self.loss_fn = prepare_handle.prepare_loss_func()
+        self.loss_fn = prepare_handle.prepare_loss_fn()
         self.total_loss = 0
         # 接下来要准备fit函数之前的所有东西, 包括callbacks.
         # 记录数据所需:
         # 这里的params统一传到基类成员, 所有派生类共享. 注意这里一定要精简.
         self.metrics = ['categorical_accuracy']
-        self.prepare_batch = prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query)
+        self.prepare_batch = self.model.prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query)
         self.verbose = args.verbose
         self.max_epoch = args.max_epoch
         # self.params = {

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+from typing import Callable, Tuple
+from models.utils import create_nshot_task_label
 
 class FewShotModel(nn.Module):
     def __init__(self, args):
@@ -24,6 +26,29 @@ class FewShotModel(nn.Module):
             self.encoder = Wide_ResNet(28, 10, 0.5)  # we set the dropout=0.5 directly here, it may achieve better results by tunning the dropout
         else:
             raise ValueError('')
+
+    def prepare_nshot_task(self, shot: int, way: int, query: int) -> Callable:
+        """Typical shot-shot task preprocessing.
+
+        # Arguments
+            shot: Number of samples for each class in the shot-shot classification task
+            way: Number of classes in the shot-shot classification task
+            query: Number of query samples for each class in the shot-shot classification task
+
+        # Returns
+            prepare_nshot_task_: A Callable that processes a few shot tasks with specified shot, way and query
+        """
+        def prepare_nshot_task_(batch: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+            """Create 0-way label and move to GPU.
+
+            TODO: Move to arbitrary device
+            """
+            x, y = batch
+            x = x.double().cuda()
+            # Create dummy 0-(num_classes - 1) label, 每个 query 个, 请看create_nshot_task_label函数.
+            y = create_nshot_task_label(way, query).cuda()
+            return x, y
+        return prepare_nshot_task_
     
     def split_instances_FEAT(self, data):
         # NB: Return idx, not instance.
@@ -39,6 +64,7 @@ class FewShotModel(nn.Module):
             return data[:self.args.shot*self.args.way], data[self.args.shot*self.args.way:]
         else:
             return data[:self.args.eval_shot*self.args.eval_way], data[self.args.eval_shot*self.args.eval_way:]
+
     def forward(self, x, get_feature=False):
         # 做好embedding, 然后传support set, query set.
         if get_feature:
@@ -59,5 +85,5 @@ class FewShotModel(nn.Module):
             logits, logits_reg = self._forward(support, query)
             return logits, logits_reg
 
-    def _forward(self, x, support_idx, query_idx):
+    def _forward(self, support, query):
         raise NotImplementedError('Suppose to be implemented by subclass')

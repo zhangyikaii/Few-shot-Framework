@@ -1,5 +1,5 @@
 from torch.utils.data import Sampler
-from typing import List, Iterable, Callable, Tuple
+from typing import List, Iterable
 import numpy as np
 import torch
 
@@ -9,29 +9,29 @@ class NShotTaskSampler(Sampler):
     def __init__(self,
                  dataset: torch.utils.data.Dataset,
                  episodes_per_epoch: int = None,
-                 n: int = None,
-                 k: int = None,
-                 q: int = None,
+                 shot: int = None,
+                 way: int = None,
+                 query: int = None,
                  num_tasks: int = 1,
                  fixed_tasks: List[Iterable[int]] = None):
-        """PyTorch Sampler subclass that generates batches of n-shot, k-way, q-query tasks.
+        """PyTorch Sampler subclass that generates batches of shot-shot, way-way, query-query tasks.
 
-        Each n-shot task contains a "support set" of `k` sets of `n` samples and a "query set" of `k` sets
-        of `q` samples. The support set and the query set are all grouped into one Tensor such that the first n * k
-        samples are from the support set while the remaining q * k samples are from the query set.
+        Each shot-shot task contains a "support set" of `way` sets of `shot` samples and a "query set" of `way` sets
+        of `query` samples. The support set and the query set are all grouped into one Tensor such that the first shot * way
+        samples are from the support set while the remaining query * way samples are from the query set.
 
-        分 n*k 和 q*k, 并且是不相交的.
+        分 shot*way 和 query*way, 并且是不相交的.
 
         The support and query sets are sampled such that they are disjoint i.e. do not contain overlapping samples.
 
         请注意下面 num_tasks 和 episodes_per_epoch 的区别.
         # Arguments
             dataset: Instance of torch.utils.data.Dataset from which to draw samples
-            episodes_per_epoch: Arbitrary number of batches of n-shot tasks to generate in one epoch
-            n_shot: int. Number of samples for each class in the n-shot classification tasks.
-            k_way: int. Number of classes in the n-shot classification tasks.
-            q_queries: int. Number query samples for each class in the n-shot classification tasks.
-            num_tasks: Number of n-shot tasks to group into a single batch
+            episodes_per_epoch: Arbitrary number of batches of shot-shot tasks to generate in one epoch
+            n_shot: int. Number of samples for each class in the shot-shot classification tasks.
+            k_way: int. Number of classes in the shot-shot classification tasks.
+            q_queries: int. Number query samples for each class in the shot-shot classification tasks.
+            num_tasks: Number of shot-shot tasks to group into a single batch
             fixed_tasks: If this argument is specified this Sampler will always generate tasks from
                 the specified classes
         """
@@ -43,9 +43,9 @@ class NShotTaskSampler(Sampler):
 
         self.num_tasks = num_tasks
         # TODO: Raise errors if initialise badly
-        self.k = k
-        self.n = n
-        self.q = q
+        self.way = way
+        self.shot = shot
+        self.query = query
         self.fixed_tasks = fixed_tasks
 
         self.i_task = 0
@@ -58,11 +58,12 @@ class NShotTaskSampler(Sampler):
         for _ in range(self.episodes_per_epoch):
             batch = []
 
+            # 每个 episode 一切都重新来了.
             for task in range(self.num_tasks):
                 if self.fixed_tasks is None:
                     # Get random classes
-                    # 随机sample k 个类:
-                    episode_classes = np.random.choice(self.dataset.df['class_id'].unique(), size=self.k, replace=False)
+                    # 随机sample way 个类:
+                    episode_classes = np.random.choice(self.dataset.df['class_id'].unique(), size=self.way, replace=False)
                     # print("fixed_tasks is None, episode_classes:", episode_classes)
                 else:
                     # Loop through classes in fixed_tasks
@@ -70,70 +71,27 @@ class NShotTaskSampler(Sampler):
                     self.i_task += 1
                 df = self.dataset.df[self.dataset.df['class_id'].isin(episode_classes)]
 
-                # support_k 字典, <key: k 个class, value: 每个class对应的n个数据.
-                support_k = {k: None for k in episode_classes}
-                for k in episode_classes:
+                # support_k 字典, <key: way 个class, value: 每个class对应的n个数据.
+                support_k = {way: None for way in episode_classes}
+                for way in episode_classes:
                     # Select support examples
-                    # 随机sample n 个样本, 在之前sample的k类的每类下.
-                    support = df[df['class_id'] == k].sample(self.n)
-                    support_k[k] = support
+                    # 随机sample shot 个样本, 在之前sample的k类的每类下.
+                    support = df[df['class_id'] == way].sample(self.shot)
+                    support_k[way] = support
 
                     for i, s in support.iterrows():
                         batch.append(s['id'])
 
-                for k in episode_classes:
-                    # 随机sample q 个样本, 在之前sample的k类的每类下, 但是需要保证不和support有交集.
-                    query = df[(df['class_id'] == k) & (~df['id'].isin(support_k[k]['id']))].sample(n=self.q)
-                    for i, q in query.iterrows():
-                        batch.append(q['id'])
+                for way in episode_classes:
+                    # 随机sample query 个样本, 在之前sample的k类的每类下, 但是需要保证不和support有交集.
+                    query = df[(df['class_id'] == way) & (~df['id'].isin(support_k[way]['id']))].sample(n=self.query)
+                    for i, query in query.iterrows():
+                        batch.append(query['id'])
 
             # 请特别注意, batch里面的是按照顺序排的:
-            #   n 个support 出现 k 次(因为k个不同类) + q 个query 出现 k 次.
-            #   也就是 (n * k + q * k), 这样构成了一个task, 这可以有很多个task, 请注意这里需要设置几个task, ProtoNet这里是一个.
-            #   也就是 (n) 个这样一组是 一类, 达到 (n * k) 之后 (q) 个这样一组是一类.
+            #   shot 个support 出现 way 次(因为k个不同类) + query 个query 出现 way 次.
+            #   也就是 (shot * way + query * way), 这样构成了一个task, 这可以有很多个task, 请注意这里需要设置几个task, ProtoNet这里是一个.
+            #   也就是 (shot) 个这样一组是 一类, 达到 (shot * way) 之后 (query) 个这样一组是一类.
             # episodes_per_epoch 决定了有多少个这样的多task训练.
             yield np.stack(batch)
-
-def prepare_nshot_task(n: int, k: int, q: int) -> Callable:
-    """Typical n-shot task preprocessing.
-
-    # Arguments
-        n: Number of samples for each class in the n-shot classification task
-        k: Number of classes in the n-shot classification task
-        q: Number of query samples for each class in the n-shot classification task
-
-    # Returns
-        prepare_nshot_task_: A Callable that processes a few shot tasks with specified n, k and q
-    """
-    def prepare_nshot_task_(batch: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Create 0-k label and move to GPU.
-
-        TODO: Move to arbitrary device
-        """
-        x, y = batch
-        x = x.double().cuda()
-        # Create dummy 0-(num_classes - 1) label, 每个 q 个, 请看create_nshot_task_label函数.
-        y = create_nshot_task_label(k, q).cuda()
-        return x, y
-
-    return prepare_nshot_task_
-
-
-def create_nshot_task_label(k: int, q: int) -> torch.Tensor:
-    """Creates an n-shot task label.
-
-    Label has the structure:
-        [0]*q + [1]*q + ... + [k-1]*q
-
-    # Arguments
-        k: Number of classes in the n-shot classification task
-        q: Number of query samples for each class in the n-shot classification task
-
-    # Returns
-        y: Label vector for n-shot task of shape [q * k, ]
-    """
-
-    y = torch.arange(0, k, 1 / q).long() # 很精妙, 注意强转成long了.
-    # 返回从 0 ~ k - 1 (label), 每个元素有 q 个(query samples).
-    return y
 

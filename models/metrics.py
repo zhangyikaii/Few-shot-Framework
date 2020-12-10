@@ -21,6 +21,7 @@ NAMED_METRICS = {
 def pairwise_distances(x: torch.Tensor,
                        y: torch.Tensor,
                        matching_fn: str,
+                       temperature: float,
                        EPSILON: float = 1e-8) -> torch.Tensor:
     """Efficiently calculate pairwise distances (or other similarity scores) between
     two sets of samples.
@@ -37,7 +38,7 @@ def pairwise_distances(x: torch.Tensor,
         distances = (
                 x.unsqueeze(1).expand(n_x, n_y, -1) -
                 y.unsqueeze(0).expand(n_x, n_y, -1)
-        ).pow(2).sum(dim=2)
+        ).pow(2).sum(dim=2) / temperature
         return distances
     elif matching_fn == 'cosine':
         normalised_x = x / (x.pow(2).sum(dim=1, keepdim=True).sqrt() + EPSILON)

@@ -1,12 +1,8 @@
 import os, shutil
 import os.path as osp
 import torch
-import torch.nn as nn
 import numpy as np
-import torch.optim as optim
 from torch.utils.data import DataLoader
-
-from models.few_shot.protonet import ProtoNet
 
 def mkdir(dir):
     """Create a directory, ignoring exceptions
@@ -57,7 +53,7 @@ def get_command_line_parser():
                         choices=['ConvNet', 'Res12', 'Res18', 'WRN'])
     
     parser.add_argument('--max_epoch', type=int, default=200)
-    parser.add_argument('--num_tasks', type=int, default=1000)
+    parser.add_argument('--num_tasks', type=int, default=1)
     parser.add_argument('--episodes_per_epoch', type=int, default=100)
     parser.add_argument('--drop_lr_every', type=int, default=40)
     parser.add_argument('--model_class', type=str, default='ProtoNet', 
@@ -67,6 +63,10 @@ def get_command_line_parser():
     parser.add_argument('--balance', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=1)
     parser.add_argument('--temperature2', type=float, default=1)  # the temperature in the  
+
+    parser.add_argument('--loss_fn', type=str, default='F-cross_entropy',
+                        choices=['F-cross_entropy', 'nn-cross_entropy'])
+    parser.add_argument('--meta_batch_size', default=32, type=int)
     
     # optimization parameters
     parser.add_argument('--orig_imsize', type=int, default=-1) # -1 for no cache, and -2 for no resize, only for MiniImageNet and CUB
@@ -147,85 +147,20 @@ def preprocess_args(args):
     
     return args
 
-class PrepareFunc(object):
-    def __init__(self, args):
-        self.args = args
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    def prepare_model(self):
-        # 这里决定了是什么模型.
-        # model = ProtoNet(args)
-        model = eval(self.args.model_class)(self.args)
+def create_nshot_task_label(way: int, query: int) -> torch.Tensor:
+    """Creates an shot-shot task label.
 
-        # load pre-trained model (no FC weights)
-        # if args.init_weights is not None:
-        #     model_dict = model.state_dict()        
-        #     pretrained_dict = torch.load(args.init_weights)['params']
-        #     if args.backbone_class == 'ConvNet':
-        #         pretrained_dict = {'encoder.'+k: v for k, v in pretrained_dict.items()}
-        #     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
-        #     print(pretrained_dict.keys())
-        #     model_dict.update(pretrained_dict)
-        #     model.load_state_dict(model_dict)
+    Label has the structure:
+        [0]*query + [1]*query + ... + [way-1]*query
 
-        if torch.cuda.is_available():
-            torch.backends.cudnn.benchmark = True
-            
-        model = model.to(self.device, dtype=torch.double)
+    # Arguments
+        way: Number of classes in the shot-shot classification task
+        query: Number of query samples for each class in the shot-shot classification task
 
-        if self.args.multi_gpu:
-            model.encoder = nn.DataParallel(model.encoder, dim=0)
-            para_model = model.to(self.device, dtype=torch.double)
-        else:
-            para_model = model.to(self.device, dtype=torch.double)
+    # Returns
+        y: Label vector for shot-shot task of shape [query * way, ]
+    """
 
-        return model, para_model
-
-    def prepare_optimizer(self, model):
-        top_para = [v for k,v in model.named_parameters() if 'encoder' not in k]       
-        # as in the literature, we use ADAM for ConvNet and SGD for other backbones
-        if self.args.backbone_class == 'ConvNet':
-            optimizer = optim.Adam(
-                [{'params': model.encoder.parameters()},
-                {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
-                lr=self.args.lr,
-                # weight_decay=args.weight_decay, do not use weight_decay here
-            )
-        else:
-            optimizer = optim.SGD(
-                [{'params': model.encoder.parameters()},
-                {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
-                lr=self.args.lr,
-                momentum=self.args.mom,
-                nesterov=True,
-                weight_decay=self.args.weight_decay
-            )        
-
-        # trick
-        # 关注step_size等参数.
-        if self.args.lr_scheduler == 'step':
-            lr_scheduler = optim.lr_scheduler.StepLR(
-                                optimizer,
-                                step_size=int(self.args.step_size),
-                                gamma=self.args.gamma
-                            )
-        elif self.args.lr_scheduler == 'multistep':
-            lr_scheduler = optim.lr_scheduler.MultiStepLR(
-                                optimizer,
-                                milestones=[int(_) for _ in self.args.step_size.split(',')],
-                                gamma=self.args.gamma,
-                            )
-        elif self.args.lr_scheduler == 'cosine':
-            lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                                optimizer,
-                                self.args.max_epoch,
-                                eta_min=0   # a tuning parameter
-                            )
-        else:
-            raise ValueError('No Such Scheduler')
-
-        return optimizer, lr_scheduler
-
-    def prepare_loss_func(self):
-        return nn.CrossEntropyLoss()
-
-        
+    y = torch.arange(0, way, 1 / query).long() # 很精妙, 注意强转成long了.
+    # 返回从 0 ~ way - 1 (label), 每个元素有 query 个(query samples).
+    return y

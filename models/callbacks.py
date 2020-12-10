@@ -205,7 +205,7 @@ class EvaluateFewShot(Callback):
         self.simulation_test = simulation_test
 
     def on_epoch_begin(self, epoch, logs=None):
-        self.logger.info(f'Epoch %d:' % (epoch))
+        self.logger.info(f'Epoch %d' % (epoch))
 
     def predict_log(self, epoch, dataloader, prefix, logs=None):
         seen = 0
@@ -246,8 +246,11 @@ class EvaluateFewShot(Callback):
             # TODO: 这里输出一下, 一个epoch也结束了, 输出一下validation的结果.
             # print()
             # print(prefix + 'loss: %f, ' % totals['loss'] + metric_name + ': %f.' % totals[metric_name])
-            self.logger.info(prefix + 'loss: %f, ' % totals['loss'] 
-                + metric_name + ': %f.' % totals[metric_name])
+            # self.logger.info(prefix + 'loss: %f, ' % totals['loss'] 
+            #     + metric_name + ': %f.' % totals[metric_name])
+
+            # 算了, 后面CSV会输到文件里.
+            pass
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -398,9 +401,6 @@ class CSVLogger(Callback):
 
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         # row_dict 就是 csv 文件里记录的信息.
-        self.logger.info(
-            [f'{k}: {dict1[k]}' for k in dict1.keys()]
-        )
         self.writer.writerow(row_dict)
         self.csv_file.flush()
 
