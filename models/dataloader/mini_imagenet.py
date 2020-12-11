@@ -16,13 +16,12 @@ sys.path.append("../../")
 sys.path.extend([os.path.join(root, name) for root, dirs, _ in os.walk("../") for name in dirs])
 
 from config import DATA_PATH
-from models.sampler import NShotTaskSampler
+from models.sampler import ShotTaskSampler
 THIS_PATH = osp.dirname(__file__)
 ROOT_PATH = osp.abspath(osp.join(THIS_PATH, '..', '..'))
 IMAGE_PATH = osp.join(DATA_PATH, 'mini_imagenet/images')
 SPLIT_PATH = osp.join(ROOT_PATH, 'data/mini_imagenet/split')
 CACHE_PATH = osp.join(ROOT_PATH, '.cache/')
-
 
 # for test
 class DummyDataset(Dataset):
@@ -180,18 +179,18 @@ class MiniImageNet(Dataset):
             })
         return images
 
-
 def get_dataloader(args):
     def taskloader(stype, args, shot, way, query):
         dataset = eval(args.dataset)(stype, args)
         taskloader = DataLoader(
             dataset,
-            batch_sampler=NShotTaskSampler(dataset, args.episodes_per_epoch, shot, way, query),
+            batch_sampler=ShotTaskSampler(dataset, args.episodes_per_epoch, shot, way, query),
             num_workers=4
         )
         return taskloader
 
-    train_taskloader, val_taskloader, test_taskloader = taskloader('train', args, args.shot, args.way, args.query), \
+    train_taskloader, val_taskloader, test_taskloader = \
+        taskloader('train', args, args.shot, args.way, args.query), \
         taskloader('val', args, args.shot, args.way, args.query), \
         taskloader('test', args, args.eval_shot, args.eval_way, args.eval_query)
 

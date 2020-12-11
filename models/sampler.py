@@ -4,8 +4,8 @@ import numpy as np
 import torch
 
 # 因为Dataloader传入的数据集是 map-style datasets, (这也仅在这种下标数据集上使用.)
-# 所以下面传入的NShotTaskSampler(batch_sampler参数) yields a list of batch indices.
-class NShotTaskSampler(Sampler):
+# 所以下面传入的ShotTaskSampler(batch_sampler参数) yields a list of batch indices.
+class ShotTaskSampler(Sampler):
     def __init__(self,
                  dataset: torch.utils.data.Dataset,
                  episodes_per_epoch: int = None,
@@ -35,7 +35,7 @@ class NShotTaskSampler(Sampler):
             fixed_tasks: If this argument is specified this Sampler will always generate tasks from
                 the specified classes
         """
-        super(NShotTaskSampler, self).__init__(dataset)
+        super(ShotTaskSampler, self).__init__(dataset)
         self.episodes_per_epoch = episodes_per_epoch
         self.dataset = dataset
         if num_tasks < 1:

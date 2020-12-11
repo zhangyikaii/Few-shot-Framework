@@ -61,7 +61,6 @@ def get_command_line_parser():
 
     parser.add_argument('--loss_fn', type=str, default='F-cross_entropy',
                         choices=['F-cross_entropy', 'nn-cross_entropy'])
-    parser.add_argument('--meta_batch_size', default=32, type=int)
     
     # optimization parameters
     parser.add_argument('--orig_imsize', type=int, default=-1) # -1 for no cache, and -2 for no resize, only for MiniImageNet and CUB
@@ -86,6 +85,15 @@ def get_command_line_parser():
     
     parser.add_argument('--test_model_filepath', type=str, default=None)
     parser.add_argument('--verbose', action='store_true', default=False)
+
+    # MAML:
+    parser.add_argument('--meta', action='store_true', default=False)
+    parser.add_argument('--inner_train_steps', default=1, type=int)
+    parser.add_argument('--inner_val_steps', default=3, type=int)
+    parser.add_argument('--inner_lr', default=0.4, type=float)
+    parser.add_argument('--meta_lr', default=0.001, type=float)
+    parser.add_argument('--meta_batch_size', default=32, type=int)
+    parser.add_argument('--order', default=1, type=int)
     
     return parser
 

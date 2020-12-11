@@ -1,6 +1,6 @@
 python ../main.py \
     --max_epoch 200 \
-    --gpu 12 \
+    --gpu 0 \
     --model_class ProtoNet \
     --distance l2 \
     --backbone_class ConvNet \

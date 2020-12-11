@@ -7,7 +7,7 @@ sys.path.extend([os.path.join(root, name) for root, dirs, _ in os.walk("../") fo
 
 from torch.utils.data import DataLoader
 
-from models.sampler import NShotTaskSampler
+from models.sampler import ShotTaskSampler
 from models.dataloader.mini_imagenet import DummyDataset
 from models.backbone.convnet import ConvNet
 from models.few_shot.protonet import ProtoNet
@@ -20,7 +20,7 @@ class TestProtoNets(unittest.TestCase):
     def _test_n_k_q_combination(self, n, k, q):
         n_shot_taskloader = \
             DataLoader(self.dataset,
-                       batch_sampler=NShotTaskSampler(self.dataset, 100, n, k, q))
+                       batch_sampler=ShotTaskSampler(self.dataset, 100, n, k, q))
 
         for batch in n_shot_taskloader:
             x, y = batch

@@ -115,35 +115,6 @@ class Callback(object):
     def on_train_end(self, logs=None):
         pass
 
-class DefaultCallback(Callback):
-    """Records metrics over epochs by averaging over each batch.
-
-    NB The metrics are calculated with a moving model
-    """
-    def __init__(self, metrics):
-        super(DefaultCallback, self).__init__()
-        self.metrics = metrics
-        self.seen = 0
-        self.totals = {}        
-
-    def on_batch_end(self, batch, logs=None):
-        logs = logs or {}
-        batch_size = logs.get('size', 1) or 1
-        self.seen += batch_size
-
-        for k, v in logs.items():
-            if k in self.totals:
-                self.totals[k] += v * batch_size
-            else:
-                self.totals[k] = v * batch_size
-
-    def on_epoch_end(self, epoch, logs=None):
-        if logs is not None:
-            for k in self.metrics:
-                if k in self.totals:
-                    # Make value available to next callbacks.
-                    logs[k] = self.totals[k] / self.seen
-
 class ProgressBarLogger(Callback):
     """TQDM progress bar that displays the running average of loss and other metrics."""
     def __init__(self, length, verbose=True):
@@ -159,7 +130,7 @@ class ProgressBarLogger(Callback):
         # from torch.utils.tensorboard import SummaryWriter
         # self.writer = SummaryWriter('runs/epoch-' + str(epoch))
         self.seen = 0
-        
+
     def on_batch_end(self, batch, logs=None):
         self.seen += 1
 
@@ -169,7 +140,6 @@ class ProgressBarLogger(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         self.pbar.close()
-
 
 # 未改, 最好在 eval_fn 调用处要改一下.
 class EvaluateFewShot(Callback):
@@ -182,7 +152,7 @@ class EvaluateFewShot(Callback):
         n_shot: int. Number of samples for each class in the n-shot classification tasks.
         k_way: int. Number of classes in the n-shot classification tasks.
         q_queries: int. Number query samples for each class in the n-shot classification tasks.
-        task_loader: Instance of NShotWrapper class
+        task_loader: Instance of ShotWrapper class
         prepare_batch: function. The preprocessing function to apply to samples from the dataset.
         prefix: str. Prefix to identify dataset.
     """
@@ -197,7 +167,8 @@ class EvaluateFewShot(Callback):
                  simulation_test: bool = False):
         super(EvaluateFewShot, self).__init__()
         self.val_loader = val_loader
-        self.test_loader = test_loader
+        if simulation_test:
+            self.test_loader = test_loader
         self.prepare_batch = prepare_batch
         self.eval_fn = eval_fn
         self.metric_name = metric_name
@@ -212,30 +183,31 @@ class EvaluateFewShot(Callback):
         seen = 0
         metric_name = prefix + self.metric_name
         totals = {'loss': 0, metric_name: 0}
-        # 这里开始做epoch_end的val:
-        for batch_index, batch in enumerate(tqdm(dataloader)):
-            x, y = self.prepare_batch(batch)
+        with torch.no_grad():
+            # 这里开始做epoch_end的val:
+            for batch_index, batch in enumerate(tqdm(dataloader)):
+                x, y = self.prepare_batch(batch)
 
-            # 这里eval_fn就是该类(在callbacks(list))初始化时传进来的函数, 在/few_shot/下. \
-            #   比如 matching_net_episode.
+                # 这里eval_fn就是该类(在callbacks(list))初始化时传进来的函数, 在/few_shot/下. \
+                #   比如 matching_net_episode.
 
-            # on_epoch_end 这里的: \
-            #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model_logger 里面设置的model, \
-            #   实际上就是! fit 函数时传进来的model. 这个model就是在models.py里面定义的.
-            # 注意这里的传参逻辑一定要搞清楚.
-            
-            # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
-            # 就相当于forward.
+                # on_epoch_end 这里的: \
+                #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model_logger 里面设置的model, \
+                #   实际上就是! fit 函数时传进来的model. 这个model就是在models.py里面定义的.
+                # 注意这里的传参逻辑一定要搞清楚.
+                
+                # 注意这里就是测试过程了呀, 完全在evaluation文件夹下数据上测, 注意train=False, 虽然还是用 proto_net_episode.
+                # 就相当于forward.
 
-            logits, reg_logits, loss = self.eval_fn(
-                x,
-                y,
-                train=False
-            )
-            seen += logits.shape[0]
+                logits, reg_logits, loss = self.eval_fn(
+                    x=x,
+                    y=y,
+                    train=False
+                )
+                seen += logits.shape[0]
 
-            totals['loss'] += loss.item() * logits.shape[0]
-            totals[metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
+                totals['loss'] += loss.item() * logits.shape[0]
+                totals[metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
 
         totals['loss'] /= seen
         totals[metric_name] /= seen

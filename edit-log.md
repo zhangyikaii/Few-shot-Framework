@@ -33,7 +33,7 @@
 
 + 设置随机数种子是不是一个trick? `query = df[(df['class_id'] == k) & (~df['id'].isin(support_k[k]['id']))].sample(n=self.q)` `core.py` 这里是否需要设置随机数种子. 前面的support, 它的类也是.
 
-+ `NShotTaskSampler` 类太关键了, 所以之前没看导致relation net那边可能support/query写反了.
++ `ShotTaskSampler` 类太关键了, 所以之前没看导致relation net那边可能support/query写反了.
 
 + 2020-12-1: 下午看test部分.
 
@@ -62,7 +62,7 @@ models.py 里面的encoder()就是backbone.
 
 + 在main文件里, 一个技巧, 期望 dataset_class 根据参数变化(指向不同的类), 通过赋值即可.
 
-+ `NShotTaskSampler` 决定了如何 generates batches of n-shot, k-way, q-query tasks.
++ `ShotTaskSampler` 决定了如何 generates batches of n-shot, k-way, q-query tasks.
 
   `--k-train 20 --n-train 1 --q-train 15` 请注意在训练时候的 `k, n, q` 是这样的.
 
@@ -107,3 +107,18 @@ models.py 里面的encoder()就是backbone.
 + TODO: 注意在 `Dataloader` 那里不要分割support和query. 确认一下FEAT是怎么做的.
 
 + TODO: 添加终止程序后删除log file等.
+
+
+
+## Summary
+
+在这里理清整个过程:
+
+for epoch:
+  for batch:
+    过一遍episode里sample出来的所有. 代码在`yield np.stack(batch)`
+    一个episode里有num_task轮.
+    具体来说, 就是:
+    (shot * way + query * way)
+    (SupportSet + QuerySet)
+    (1 * 5      + 15 * 5)

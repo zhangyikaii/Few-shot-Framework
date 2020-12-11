@@ -8,7 +8,6 @@ import os.path as osp
 import json
 
 from models.callbacks import (
-    DefaultCallback,
     ProgressBarLogger,
     CallbackList,
     Callback,
@@ -16,6 +15,7 @@ from models.callbacks import (
     ModelCheckpoint,
     CSVLogger
 )
+from models.few_shot.protonet import fit_handle as ProtoNet_fit_handle
 
 from models.dataloader.mini_imagenet import get_dataloader
 from models.few_shot.helper import PrepareFunc
@@ -47,6 +47,7 @@ def gradient_step(model: Module, optimizer: Optimizer, loss_fn: Callable, x: tor
 
 class Trainer(object):
     def __init__(self, args):
+        torch.backends.cudnn.benchmark = True
         self.logger = set_logger(args, 'train_logger')
         for k in vars(args).keys():
             self.logger.info(k + ': %s' % str(vars(args)[k]))
@@ -64,6 +65,11 @@ class Trainer(object):
         self.model, self.para_model = prepare_handle.prepare_model()
         self.optimizer, self.lr_scheduler = prepare_handle.prepare_optimizer(self.model)
         self.loss_fn = prepare_handle.prepare_loss_fn()
+        self.fit_handle = eval(args.model_class + '_fit_handle')(
+            model=self.model,
+            optimizer=self.optimizer,
+            loss_fn=self.loss_fn
+        )
         self.total_loss = 0
         # 接下来要准备fit函数之前的所有东西, 包括callbacks.
         # 记录数据所需:
@@ -119,6 +125,12 @@ class Trainer(object):
                                      + [ProgressBarLogger(length=len(self.train_loader), verbose=self.verbose), ])
         self.callbacks.set_model_logger(self.model, self.logger)
 
+        """
+        meta
+        """
+        self.meta = args.meta
+
+
     def batch_metrics(self, logits, y, batch_logs):
         self.model.eval()
         for m in self.metrics:
@@ -129,27 +141,6 @@ class Trainer(object):
             #     batch_logs = m(y, logits)
 
         return batch_logs
-
-
-    def fit_handle(self,
-                   x: torch.Tensor,
-                   y: torch.Tensor,
-                   train: bool = True):
-        if train:
-            # Zero gradients
-            self.model.train()
-            self.optimizer.zero_grad()
-        else:
-            self.model.eval()
-        
-        logits, reg_logits = self.model(x)
-        loss = self.loss_fn(logits, y)
-
-        if train:
-            # Take gradient step
-            loss.backward()
-            self.optimizer.step()
-        return logits, reg_logits, loss
 
     def lr_handle(self, epoch, epoch_logs):
         self.lr_scheduler.step()
@@ -170,7 +161,7 @@ class Trainer(object):
             self.logger.info('Begin training...')
 
         self.callbacks.on_train_begin()
-        
+
         # from torch.utils.tensorboard import SummaryWriter
         # writer = SummaryWriter('runs/model')
 
@@ -184,7 +175,7 @@ class Trainer(object):
 
                 x, y = self.prepare_batch(batch)
 
-                logits, reg_logits, loss = self.fit_handle(x, y)
+                logits, reg_logits, loss = self.fit_handle(x=x, y=y, train=True)
                 batch_logs['loss'] = loss.item()
                 # Loops through all metrics
                 batch_logs = self.batch_metrics(logits, y, batch_logs)

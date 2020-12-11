@@ -4,7 +4,38 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 from models.metrics import pairwise_distances
+from torch.optim import Optimizer
+from typing import Callable
 
+
+# 写一个两层的函数, model之类先传
+def fit_handle(
+    model: nn,
+    optimizer: Optimizer,
+    loss_fn: Callable
+    ):
+    def core(
+        x: torch.Tensor,
+        y: torch.Tensor,
+        train: bool = True
+        ):
+        if train:
+            # Zero gradients
+            model.train()
+            optimizer.zero_grad()
+        else:
+            model.eval()
+
+        logits, reg_logits = model(x)
+        loss = loss_fn(logits, y)
+
+        if train:
+            # Take gradient step
+            loss.backward()
+            optimizer.step()
+        return logits, reg_logits, loss
+    return core
+    
 class ProtoNet(FewShotModel):
     def __init__(self, args):
         super().__init__(args)
