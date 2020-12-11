@@ -1,0 +1,21 @@
+python ../main.py \
+    --max_epoch 200 \
+    --gpu 12 \
+    --model_class ProtoNet \
+    --distance l2 \
+    --backbone_class ConvNet \
+    --dataset MiniImageNet \
+    --way 5 --eval_way 5 \
+    --shot 1 --eval_shot 1 \
+    --query 15 --eval_query 15 \
+    --logger_filepath /logs/process \
+    --balance 1 \
+    --temperature 64 \
+    --temperature2 16 \
+    --lr 0.0001 --lr_mul 10 --lr_scheduler step \
+    --step_size 20 \
+    --gamma 0.5 \
+    --eval_interval 1 \
+    --verbose \
+    --test_model_filepath /mnt/data3/lus/zhangyk/models/ProtoNet/ProtoNet_MiniImageNet_ConvNet-backbone_l2_5-way_1-shot__5-eval-way_1-eval-shot__15-query_15-eval-query_2020-12-11_01-20-00.pth
+    # --init_weights ./saves/initialization/miniimagenet/con-pre.pth

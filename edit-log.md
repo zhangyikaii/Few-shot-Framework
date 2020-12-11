@@ -104,4 +104,6 @@ models.py 里面的encoder()就是backbone.
 
 + 在 `nn` 模型内, 随着`model.eval()`, `self.traing` 在变化.
 
-+ TODO: 注意在 `Dataloader` 那里不要分割support和query.
++ TODO: 注意在 `Dataloader` 那里不要分割support和query. 确认一下FEAT是怎么做的.
+
++ TODO: 添加终止程序后删除log file等.

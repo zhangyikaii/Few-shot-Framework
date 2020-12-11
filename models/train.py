@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 
 from typing import Callable, List, Union
 import os.path as osp
+import json
 
 from models.callbacks import (
     DefaultCallback,
@@ -47,6 +48,9 @@ def gradient_step(model: Module, optimizer: Optimizer, loss_fn: Callable, x: tor
 class Trainer(object):
     def __init__(self, args):
         self.logger = set_logger(args, 'train_logger')
+        for k in vars(args).keys():
+            self.logger.info(k + ': %s' % str(vars(args)[k]))
+
         """
         准备 Dataloader
         """
@@ -81,7 +85,9 @@ class Trainer(object):
         # args 是一个参数集合, 期望在这里分模块, 对每个类 对应特定的功能, 类的参数也要**具体化**, 这样才可以一层层分解, 较好.
 
         self.metric_name = f'{args.eval_shot}-shot_{args.eval_way}-way_acc'
-        self.model_filepath = f'/mnt/data3/lus/zhangyk/models/proto_nets/{args.params_str}.pth'
+        self.model_filepath = args.model_filepath
+        self.train_mode = args.train_mode
+
         self.evaluate_handle = EvaluateFewShot(
             val_loader=self.val_loader,
             test_loader=self.test_loader,
@@ -111,6 +117,7 @@ class Trainer(object):
         # LearningRateScheduler 最好直接在fit函数里面传一个lr_scheduler, 直接step吧. 看FEAT.
         self.callbacks = CallbackList((callbacks or [])
                                      + [ProgressBarLogger(length=len(self.train_loader), verbose=self.verbose), ])
+        self.callbacks.set_model_logger(self.model, self.logger)
 
     def batch_metrics(self, logits, y, batch_logs):
         self.model.eval()
@@ -153,10 +160,10 @@ class Trainer(object):
         self.evaluate_handle.predict_log(self.max_epoch, self.test_loader, 'test_')
 
     def fit(self):
+        if not self.train_mode:
+            return
         # Determine number of samples:
         batch_size = self.train_loader.batch_size
-
-        self.callbacks.set_model(self.model, self.logger)
 
         if self.verbose:
             # print('Begin training...')

@@ -29,12 +29,12 @@ class CallbackList(object):
     def __init__(self, callbacks):
         self.callbacks = [c for c in callbacks]
 
-    def set_model(self, model, logger):
+    def set_model_logger(self, model, logger):
         for callback in self.callbacks:
             # 每个对象设置到当前model.
             # 真正要看是怎么set_model的, 包括下面的 callback.操作函数 , 都要进到具体的对象里面看.
 
-            callback.set_model(model, logger)
+            callback.set_model_logger(model, logger)
 
     def on_epoch_begin(self, epoch, logs=None):
         """Called at the start of an epoch.
@@ -94,7 +94,7 @@ class Callback(object):
     def __init__(self):
         self.model = None
         self.logger = None
-    def set_model(self, model, logger):
+    def set_model_logger(self, model, logger):
         self.model = model
         self.logger = logger
     def on_epoch_begin(self, epoch, logs=None):
@@ -205,7 +205,8 @@ class EvaluateFewShot(Callback):
         self.simulation_test = simulation_test
 
     def on_epoch_begin(self, epoch, logs=None):
-        self.logger.info(f'Epoch %d' % (epoch))
+        # self.logger.info(f'Epoch %d' % (epoch))
+        pass
 
     def predict_log(self, epoch, dataloader, prefix, logs=None):
         seen = 0
@@ -219,7 +220,7 @@ class EvaluateFewShot(Callback):
             #   比如 matching_net_episode.
 
             # on_epoch_end 这里的: \
-            #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model 里面设置的model, \
+            #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model_logger 里面设置的model, \
             #   实际上就是! fit 函数时传进来的model. 这个model就是在models.py里面定义的.
             # 注意这里的传参逻辑一定要搞清楚.
             
@@ -251,6 +252,9 @@ class EvaluateFewShot(Callback):
 
             # 算了, 后面CSV会输到文件里.
             pass
+            self.logger.info('Epoch: %d ' % epoch + prefix + ' accuracy: %f.' % totals[metric_name])
+            if prefix == 'test_':
+                print('Epoch: %d ' % epoch + prefix + ' accuracy: %f.' % totals[metric_name])
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -259,7 +263,6 @@ class EvaluateFewShot(Callback):
             self.predict_log(epoch, self.test_loader, 'test_', logs)
 
     # TODO: 期望logs是记录了所有结果的.
-
 
 class ModelCheckpoint(Callback):
     """Save the model after every epoch.
@@ -294,6 +297,7 @@ class ModelCheckpoint(Callback):
     def __init__(self, model_filepath, monitor, save_best_only=True, mode='max', verbose=True):
         super(ModelCheckpoint, self).__init__()
         self.model_filepath = model_filepath
+        mkdir(model_filepath[:model_filepath.rfind('/')])
         self.val_monitor = 'val_' + monitor
         self.test_monitor = 'test_' + monitor
         self.save_best_only = save_best_only

@@ -4,28 +4,23 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-def mkdir(dir):
+def mkdir(dirs):
     """Create a directory, ignoring exceptions
 
     # Arguments:
         dir: Path of directory to create
     """
-    try:
-        os.makedirs(dir)
-    except:
-        pass
+    if not os.path.exists(dirs):
+        os.makedirs(dirs)
 
-def rmdir(dir):
+def rmdir(dirs):
     """Recursively remove a directory and contents, ignoring exceptions
 
    # Arguments:
        dir: Path of directory to recursively remove
    """
-    try:
-        shutil.rmtree(dir)
-    except:
-        pass
-
+    if os.path.exists(dirs):
+        shutil.rmtree(dirs)
 
 def get_command_line_parser():
     """解析命令行参数.
@@ -89,6 +84,7 @@ def get_command_line_parser():
     parser.add_argument('--eval_interval', type=int, default=1)
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
     
+    parser.add_argument('--test_model_filepath', type=str, default=None)
     parser.add_argument('--verbose', action='store_true', default=False)
     
     return parser
@@ -102,11 +98,12 @@ def set_logger(args, logger_name):
     import logging
     logging.basicConfig(
         filename=osp.abspath(osp.dirname(osp.dirname(__file__))) + f'{args.logger_filepath}/{args.params_str}.log',
-        filemode='w',
+        filemode='a',
         level=logging.DEBUG,
         format='%(asctime)s %(message)s',
-        datefmt='%m/%d/%Y %I:%M:%S %p'
+        datefmt='%Y/%m/%d %I:%M:%S %p'
     )
+    
     return logging.getLogger(logger_name)
 
 def set_gpu(x):
@@ -144,7 +141,11 @@ def preprocess_args(args):
     args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}' \
             f'_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
             f'{args.query}-query_{args.eval_query}-eval-query_{time_str}'
-    
+    args.train_mode = True if args.test_model_filepath is None else False
+    args.model_filepath = f'/mnt/data3/lus/zhangyk/models/{args.model_class}/{args.params_str}.pth' \
+        if args.test_model_filepath is None else args.test_model_filepath
+    # 在此之后 test_model_filepath 没有用了.
+
     return args
 
 def create_nshot_task_label(way: int, query: int) -> torch.Tensor:
