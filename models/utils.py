@@ -4,6 +4,11 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
+def set_seeds():
+    torch.manual_seed(929)
+    torch.cuda.manual_seed_all(929)
+    np.random.seed(929)
+
 def mkdir(dirs):
     """Create a directory, ignoring exceptions
 
@@ -49,11 +54,12 @@ def get_command_line_parser():
     
     parser.add_argument('--max_epoch', type=int, default=200)
     parser.add_argument('--num_tasks', type=int, default=1)
-    parser.add_argument('--episodes_per_epoch', type=int, default=100)
+    parser.add_argument('--episodes_per_epoch', type=int, default=200)
+    parser.add_argument('--episodes_per_val_epoch', type=int, default=200)
     parser.add_argument('--drop_lr_every', type=int, default=40)
     parser.add_argument('--model_class', type=str, default='ProtoNet', 
-                        choices=['MatchNet', 'ProtoNet', 'BILSTM', 'DeepSet', 'GCN', 'FEAT', 'FEATSTAR', 'SemiFEAT', 'SemiProtoFEAT']) # None for MatchNet or ProtoNet   
-    parser.add_argument('--logger_filepath', type=str)
+                        choices=['MAML', 'MatchNet', 'ProtoNet', 'BILSTM', 'DeepSet', 'GCN', 'FEAT', 'FEATSTAR', 'SemiFEAT', 'SemiProtoFEAT']) # None for MatchNet or ProtoNet
+    parser.add_argument('--logger_filepath', type=str, default='/logs/process')
 
     parser.add_argument('--balance', type=float, default=0)
     parser.add_argument('--temperature', type=float, default=1)
@@ -65,7 +71,7 @@ def get_command_line_parser():
     # optimization parameters
     parser.add_argument('--orig_imsize', type=int, default=-1) # -1 for no cache, and -2 for no resize, only for MiniImageNet and CUB
     parser.add_argument('--lr', type=float, default=0.0001)
-    parser.add_argument('--lr_mul', type=float, default=10)    
+    parser.add_argument('--lr_mul', type=float, default=10)
     parser.add_argument('--lr_scheduler', type=str, default='step', choices=['multistep', 'step', 'cosine'])
     parser.add_argument('--step_size', type=str, default='20')
     parser.add_argument('--gamma', type=float, default=0.2)    
@@ -81,6 +87,7 @@ def get_command_line_parser():
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--eval_interval', type=int, default=1)
+    parser.add_argument('--test_interval', type=int, default=10)
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
     
     parser.add_argument('--test_model_filepath', type=str, default=None)
@@ -88,12 +95,12 @@ def get_command_line_parser():
 
     # MAML:
     parser.add_argument('--meta', action='store_true', default=False)
-    parser.add_argument('--inner_train_steps', default=1, type=int)
-    parser.add_argument('--inner_val_steps', default=3, type=int)
-    parser.add_argument('--inner_lr', default=0.4, type=float)
-    parser.add_argument('--meta_lr', default=0.001, type=float)
-    parser.add_argument('--meta_batch_size', default=32, type=int)
-    parser.add_argument('--order', default=1, type=int)
+    parser.add_argument('--inner_train_steps', type=int, default=1)
+    parser.add_argument('--inner_val_steps', type=int, default=3)
+    parser.add_argument('--inner_lr', type=float, default=0.4)
+    parser.add_argument('--meta_lr', type=float, default=0.001)
+    parser.add_argument('--meta_batch_size', type=int, default=1)
+    parser.add_argument('--order', type=int, default=1)
     
     return parser
 

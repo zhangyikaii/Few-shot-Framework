@@ -27,7 +27,7 @@ class FewShotModel(nn.Module):
         else:
             raise ValueError('')
 
-    def prepare_nshot_task(self, shot: int, way: int, query: int) -> Callable:
+    def prepare_nshot_task(self, shot: int, way: int, query: int, meta_batch_size: int) -> Callable:
         """Typical shot-shot task preprocessing.
 
         # Arguments
@@ -50,15 +50,16 @@ class FewShotModel(nn.Module):
             return x, y
         return prepare_nshot_task_
     
-    def split_instances_FEAT(self, data):
-        # NB: Return idx, not instance.
-        args = self.args
-        if self.training:
-            return  (torch.Tensor(np.arange(args.way*args.shot)).long().view(1, args.shot, args.way), 
-                     torch.Tensor(np.arange(args.way*args.shot, args.way * (args.shot + args.query))).long().view(1, args.query, args.way))
-        else:
-            return  (torch.Tensor(np.arange(args.eval_way*args.eval_shot)).long().view(1, args.eval_shot, args.eval_way), 
-                     torch.Tensor(np.arange(args.eval_way*args.eval_shot, args.eval_way * (args.eval_shot + args.eval_query))).long().view(1, args.eval_query, args.eval_way))
+    # def split_instances_FEAT(self, data):
+    #     # NB: Return idx, not instance.
+    #     args = self.args
+    #     if self.training:
+    #         return  (torch.Tensor(np.arange(args.way*args.shot)).long().view(1, args.shot, args.way), 
+    #                  torch.Tensor(np.arange(args.way*args.shot, args.way * (args.shot + args.query))).long().view(1, args.query, args.way))
+    #     else:
+    #         return  (torch.Tensor(np.arange(args.eval_way*args.eval_shot)).long().view(1, args.eval_shot, args.eval_way), 
+    #                  torch.Tensor(np.arange(args.eval_way*args.eval_shot, args.eval_way * (args.eval_shot + args.eval_query))).long().view(1, args.eval_query, args.eval_way))
+    
     def split_instances(self, data):
         if self.training:
             return data[:self.args.shot*self.args.way], data[self.args.shot*self.args.way:]
@@ -78,7 +79,7 @@ class FewShotModel(nn.Module):
             # num_inst = instance_embs.shape[0]
             # split support query set for few-shot data
             # support_idx: [1 x n-shot x k-way], query_idx: [1 x query x way]
-            # 这里idx都是按顺序的, 从support_idx 0 ~ (n-shot x k-way) - 1, 再 query_idx 从 (n-shot x k-way) ~ 结束.
+            # 这里idx都是按顺序的, 从support_idx 0 ~ ((n-shot x k-way) - 1), 再 query_idx 从 (n-shot x k-way) ~ 结束.
             # support_idx, query_idx = self.split_instances_FEAT(x)
 
             support, query = self.split_instances(instance_embs)

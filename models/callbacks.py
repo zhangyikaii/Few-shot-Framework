@@ -164,16 +164,18 @@ class EvaluateFewShot(Callback):
                  eval_fn: Callable,
                  metric_name: str,
                  verbose: bool = True,
-                 simulation_test: bool = False):
+                 simulation_test: bool = False,
+                 test_interval: int = 0):
         super(EvaluateFewShot, self).__init__()
         self.val_loader = val_loader
-        if simulation_test:
-            self.test_loader = test_loader
+        self.test_loader = test_loader
         self.prepare_batch = prepare_batch
         self.eval_fn = eval_fn
         self.metric_name = metric_name
         self.verbose = verbose
         self.simulation_test = simulation_test
+        self.test_interval_step = 0
+        self.test_interval = test_interval
 
     def on_epoch_begin(self, epoch, logs=None):
         # self.logger.info(f'Epoch %d' % (epoch))
@@ -230,9 +232,11 @@ class EvaluateFewShot(Callback):
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
+        self.test_interval_step += 1
         self.predict_log(epoch, self.val_loader, 'val_', logs)
-        if self.simulation_test:
+        if self.simulation_test or self.test_interval_step == self.test_interval:
             self.predict_log(epoch, self.test_loader, 'test_', logs)
+            self.test_interval_step = 0
 
     # TODO: 期望logs是记录了所有结果的.
 
@@ -286,7 +290,7 @@ class ModelCheckpoint(Callback):
             self.monitor_op = np.greater
     
     def judge_monitor(self, logs):
-        if self.val_best == None:
+        if self.val_best == None or self.test_best == None:
             return True
 
         val_current = logs.get(self.val_monitor)

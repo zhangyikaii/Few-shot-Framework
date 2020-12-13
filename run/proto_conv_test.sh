@@ -17,5 +17,5 @@ python ../main.py \
     --gamma 0.5 \
     --eval_interval 1 \
     --verbose \
-    --test_model_filepath /mnt/data3/lus/zhangyk/models/ProtoNet/ProtoNet_MiniImageNet_ConvNet-backbone_l2_5-way_1-shot__5-eval-way_1-eval-shot__15-query_15-eval-query_2020-12-11_01-20-00.pth
+    --test_model_filepath /mnt/data3/lus/zhangyk/models/ProtoNet/ProtoNet_MiniImageNet_ConvNet-backbone_l2_5-way_1-shot__5-eval-way_1-eval-shot__15-query_15-eval-query_2020-12-12_03-57-45.pth
     # --init_weights ./saves/initialization/miniimagenet/con-pre.pth

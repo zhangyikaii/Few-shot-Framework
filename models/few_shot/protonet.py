@@ -66,7 +66,7 @@ class ProtoNet(FewShotModel):
         distances = pairwise_distances(query, prototypes, self.args.distance, self.args.temperature)
 
         # Prediction probabilities are softmax over distances
-        logits = (-distances).softmax(dim=1)
+        logits = -distances
 
         return logits, None
 

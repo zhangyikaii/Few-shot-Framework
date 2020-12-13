@@ -16,6 +16,7 @@ from models.callbacks import (
     CSVLogger
 )
 from models.few_shot.protonet import fit_handle as ProtoNet_fit_handle
+from models.few_shot.maml import fit_handle as MAML_fit_handle
 
 from models.dataloader.mini_imagenet import get_dataloader
 from models.few_shot.helper import PrepareFunc
@@ -26,30 +27,11 @@ from models.metrics import (
     categorical_accuracy
 )
 
-def gradient_step(model: Module, optimizer: Optimizer, loss_fn: Callable, x: torch.Tensor, y: torch.Tensor, **kwargs):
-    """Takes a single gradient step.
-
-    # Arguments
-        model: Model to be fitted
-        optimizer: optimizer to calculate gradient step from loss
-        loss_fn: Loss function to calculate between predictions and outputs
-        x: Input samples
-        y: Input targets
-    """
-    model.train()
-    optimizer.zero_grad()
-    y_pred = model(x)
-    loss = loss_fn(y_pred, y)
-    loss.backward()
-    optimizer.step()
-
-    return loss, y_pred
-
 class Trainer(object):
     def __init__(self, args):
         torch.backends.cudnn.benchmark = True
         self.logger = set_logger(args, 'train_logger')
-        for k in vars(args).keys():
+        for k in sorted(vars(args).keys()):
             self.logger.info(k + ': %s' % str(vars(args)[k]))
 
         """
@@ -70,12 +52,14 @@ class Trainer(object):
             optimizer=self.optimizer,
             loss_fn=self.loss_fn
         )
+
         self.total_loss = 0
         # 接下来要准备fit函数之前的所有东西, 包括callbacks.
         # 记录数据所需:
         # 这里的params统一传到基类成员, 所有派生类共享. 注意这里一定要精简.
         self.metrics = ['categorical_accuracy']
-        self.prepare_batch = self.model.prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query)
+        self.prepare_batch = self.model.prepare_nshot_task(args.eval_shot, args.eval_way, 
+            args.eval_query, args.meta_batch_size)
         self.verbose = args.verbose
         self.max_epoch = args.max_epoch
         # self.params = {
@@ -101,7 +85,8 @@ class Trainer(object):
             metric_name=self.metric_name,
             eval_fn=self.fit_handle,
             verbose=self.verbose,
-            simulation_test=False
+            simulation_test=False,
+            test_interval=args.test_interval
         )
         
         callbacks = [
@@ -133,12 +118,16 @@ class Trainer(object):
 
     def batch_metrics(self, logits, y, batch_logs):
         self.model.eval()
-        for m in self.metrics:
-            if isinstance(m, str):
+        with torch.no_grad():
+            for m in self.metrics:
+                if self.meta:
+                    # if meta, logits is acc.
+                    batch_logs[m] = logits
+                    return batch_logs
                 batch_logs[m] = NAMED_METRICS[m](y, logits)
-            # else:
-            #     # Assume metric is a callable function
-            #     batch_logs = m(y, logits)
+                # else:
+                #     # Assume metric is a callable function
+                #     batch_logs = m(y, logits)
 
         return batch_logs
 

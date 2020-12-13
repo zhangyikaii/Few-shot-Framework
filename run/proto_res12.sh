@@ -1,6 +1,7 @@
+# nohup \
 python ../main.py \
     --max_epoch 200 \
-    --gpu 1 \
+    --gpu 0 \
     --model_class ProtoNet \
     --distance l2 \
     --backbone_class Res12 \
@@ -16,5 +17,8 @@ python ../main.py \
     --step_size 20 \
     --gamma 0.5 \
     --eval_interval 1 \
+    --test_interval 10 \
+    --loss_fn F-cross_entropy \
     --verbose
     # --init_weights ./saves/initialization/miniimagenet/con-pre.pth
+    #     > ./result_log/$0.txt 2>&1 &

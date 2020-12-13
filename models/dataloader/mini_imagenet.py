@@ -180,19 +180,27 @@ class MiniImageNet(Dataset):
         return images
 
 def get_dataloader(args):
-    def taskloader(stype, args, shot, way, query):
+    def taskloader(stype, args, shot, way, query, episodes_per_epoch):
         dataset = eval(args.dataset)(stype, args)
         taskloader = DataLoader(
             dataset,
-            batch_sampler=ShotTaskSampler(dataset, args.episodes_per_epoch, shot, way, query),
-            num_workers=4
+            batch_sampler=ShotTaskSampler(
+                dataset=dataset,
+                episodes_per_epoch=episodes_per_epoch,
+                shot=shot,
+                way=way,
+                query=query,
+                num_tasks=args.meta_batch_size,
+            ),
+            num_workers=4,
+            pin_memory=True
         )
         return taskloader
 
     train_taskloader, val_taskloader, test_taskloader = \
-        taskloader('train', args, args.shot, args.way, args.query), \
-        taskloader('val', args, args.shot, args.way, args.query), \
-        taskloader('test', args, args.eval_shot, args.eval_way, args.eval_query)
+        taskloader('train', args, args.shot, args.way, args.query, args.episodes_per_epoch), \
+        taskloader('val', args, args.shot, args.way, args.query, args.episodes_per_val_epoch), \
+        taskloader('test', args, args.eval_shot, args.eval_way, args.eval_query, args.episodes_per_val_epoch)
 
     # return {'train': train_taskloader, 'val': val_taskloader, 'test': test_taskloader}
     return train_taskloader, val_taskloader, test_taskloader

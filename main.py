@@ -1,13 +1,15 @@
 from models.utils import (
     get_command_line_parser, 
     preprocess_args,
-    pprint
+    pprint,
+    set_seeds
 )
 from models.train import (
     Trainer
 )
 
 if __name__ == '__main__':
+    set_seeds()
     """
     准备命令行参数
     """

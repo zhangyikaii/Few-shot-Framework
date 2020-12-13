@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from models.few_shot.protonet import ProtoNet
+from models.few_shot.maml import MAML
 
 class PrepareFunc(object):
     def __init__(self, args):
@@ -39,24 +40,31 @@ class PrepareFunc(object):
         return model, para_model
 
     def prepare_optimizer(self, model):
-        top_para = [v for k,v in model.named_parameters() if 'encoder' not in k]       
+        top_para = [v for k,v in model.named_parameters() if ('encoder' not in k and 'args' not in k)]
         # as in the literature, we use ADAM for ConvNet and SGD for other backbones
-        if self.args.backbone_class == 'ConvNet':
+        if self.args.meta:
             optimizer = optim.Adam(
-                [{'params': model.encoder.parameters()},
-                {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
+                [{'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
                 lr=self.args.lr,
                 # weight_decay=args.weight_decay, do not use weight_decay here
             )
         else:
-            optimizer = optim.SGD(
-                [{'params': model.encoder.parameters()},
-                {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
-                lr=self.args.lr,
-                momentum=self.args.mom,
-                nesterov=True,
-                weight_decay=self.args.weight_decay
-            )        
+            if self.args.backbone_class == 'ConvNet':
+                optimizer = optim.Adam(
+                    [{'params': model.encoder.parameters()},
+                    {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
+                    lr=self.args.lr,
+                    # weight_decay=args.weight_decay, do not use weight_decay here
+                )
+            else:
+                optimizer = optim.SGD(
+                    [{'params': model.encoder.parameters()},
+                    {'params': top_para, 'lr': self.args.lr * self.args.lr_mul}],
+                    lr=self.args.lr,
+                    momentum=self.args.mom,
+                    nesterov=True,
+                    weight_decay=self.args.weight_decay
+                )        
 
         # trick
         # 关注step_size等参数.
