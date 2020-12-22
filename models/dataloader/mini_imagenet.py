@@ -73,8 +73,16 @@ class MiniImageNet(Dataset):
 
         # 添加新的class_id列:
         # Convert arbitrary class names of dataset to ordered 0-(num_speakers - 1) integers
+        num_classes = self.num_classes()
+        if stype == 'train':
+            assert num_classes >= args.way, f'错误: 类别数 {num_classes} 比训练时n-way {args.way} 更少, 请重新设置.'
+        elif stype == 'val':
+            assert num_classes >= args.val_way, f'错误: 类别数 {num_classes} 比验证时n-way {args.val_way} 更少, 请重新设置.'
+        elif stype == 'test':
+            assert num_classes >= args.test_way, f'错误: 类别数 {num_classes} 比测试时n-way {args.test_way} 更少, 请重新设置.'
+
         self.unique_characters = sorted(self.df['class_name'].unique())
-        self.class_name_to_id = {self.unique_characters[i]: i for i in range(self.num_classes())}
+        self.class_name_to_id = {self.unique_characters[i]: i for i in range(num_classes)}
         self.df = self.df.assign(class_id=self.df['class_name'].apply(lambda c: self.class_name_to_id[c]))
 
         # 构建 dataID -> filepath/class_id 的字典:
@@ -199,8 +207,8 @@ def get_dataloader(args):
 
     train_taskloader, val_taskloader, test_taskloader = \
         taskloader('train', args, args.shot, args.way, args.query, args.episodes_per_epoch), \
-        taskloader('val', args, args.shot, args.way, args.query, args.episodes_per_val_epoch), \
-        taskloader('test', args, args.eval_shot, args.eval_way, args.eval_query, args.episodes_per_val_epoch)
+        taskloader('val', args, args.shot, args.val_way, args.query, args.episodes_per_val_epoch), \
+        taskloader('test', args, args.test_shot, args.test_way, args.test_query, args.episodes_per_val_epoch)
 
     # return {'train': train_taskloader, 'val': val_taskloader, 'test': test_taskloader}
     return train_taskloader, val_taskloader, test_taskloader

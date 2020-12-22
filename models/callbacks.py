@@ -124,6 +124,8 @@ class ProgressBarLogger(Callback):
         self.verbose = verbose
     
     def on_epoch_begin(self, epoch, logs=None):
+        if not self.verbose:
+            return
         self.pbar = tqdm(total=self.length, desc='Epoch {}'.format(epoch))
         
         # TensorBoard Test:
@@ -132,26 +134,30 @@ class ProgressBarLogger(Callback):
         self.seen = 0
 
     def on_batch_end(self, batch, logs=None):
+        if not self.verbose:
+            return
         self.seen += 1
 
-        if self.verbose:
-            self.pbar.update(1)
-            self.pbar.set_postfix(logs)
+        self.pbar.update(1)
+        self.pbar.set_postfix(logs)
 
     def on_epoch_end(self, epoch, logs=None):
+        if not self.verbose:
+            return
+
         self.pbar.close()
 
 # 未改, 最好在 eval_fn 调用处要改一下.
 class EvaluateFewShot(Callback):
-    """Evaluate a network on an n-shot, k-way classification tasks after every epoch.
+    """Evaluate a network on an k-shot, k-way classification tasks after every epoch.
 
     # Arguments
         eval_fn: Callable to perform few-shot classification. Examples include `proto_net_episode`,
             `matching_net_episode` and `meta_gradient_step` (MAML).
-        num_tasks: int. Number of n-shot classification tasks to evaluate the model with.
-        n_shot: int. Number of samples for each class in the n-shot classification tasks.
-        k_way: int. Number of classes in the n-shot classification tasks.
-        q_queries: int. Number query samples for each class in the n-shot classification tasks.
+        num_tasks: int. Number of k-shot classification tasks to evaluate the model with.
+        k_shot: int. Number of samples for each class in the k-shot classification tasks.
+        k_way: int. Number of classes in the k-shot classification tasks.
+        q_queries: int. Number query samples for each class in the k-shot classification tasks.
         task_loader: Instance of ShotWrapper class
         prepare_batch: function. The preprocessing function to apply to samples from the dataset.
         prefix: str. Prefix to identify dataset.
@@ -160,22 +166,43 @@ class EvaluateFewShot(Callback):
     def __init__(self,
                  val_loader: torch.utils.data.DataLoader,
                  test_loader: torch.utils.data.DataLoader,
-                 prepare_batch: Callable,
+                 val_prepare_batch: Callable,
+                 test_prepare_batch: Callable,
                  eval_fn: Callable,
                  metric_name: str,
-                 verbose: bool = True,
+                 test_interval: int,
+                 model_filepath, monitor, save_best_only=True, mode='max',
                  simulation_test: bool = False,
-                 test_interval: int = 0):
+                 verbose: bool = True
+                 ):
         super(EvaluateFewShot, self).__init__()
         self.val_loader = val_loader
         self.test_loader = test_loader
-        self.prepare_batch = prepare_batch
+        self.val_prepare_batch = val_prepare_batch
+        self.test_prepare_batch = test_prepare_batch
         self.eval_fn = eval_fn
         self.metric_name = metric_name
-        self.verbose = verbose
         self.simulation_test = simulation_test
         self.test_interval_step = 0
         self.test_interval = test_interval
+
+        # model check point:
+        self.model_filepath = model_filepath
+        mkdir(model_filepath[:model_filepath.rfind('/')])
+        self.val_monitor = 'val_' + monitor
+        self.test_monitor = 'test_' + monitor
+        self.save_best_only = save_best_only
+        self.verbose = verbose
+
+        if mode not in ['min', 'max']:
+            raise ValueError('Mode must be one of (min, max).')
+
+        self.val_best, self.test_best = None, None
+
+        if mode == 'min':
+            self.monitor_op = np.less
+        elif mode == 'max':
+            self.monitor_op = np.greater
 
     def on_epoch_begin(self, epoch, logs=None):
         # self.logger.info(f'Epoch %d' % (epoch))
@@ -184,11 +211,12 @@ class EvaluateFewShot(Callback):
     def predict_log(self, epoch, dataloader, prefix, logs=None):
         seen = 0
         metric_name = prefix + self.metric_name
-        totals = {'loss': 0, metric_name: 0}
+        loss_name = prefix + 'loss'
+        totals = {loss_name: 0, metric_name: 0}
         with torch.no_grad():
             # 这里开始做epoch_end的val:
             for batch_index, batch in enumerate(tqdm(dataloader)):
-                x, y = self.prepare_batch(batch)
+                x, y = eval('self.' + prefix + 'prepare_batch')(batch)
 
                 # 这里eval_fn就是该类(在callbacks(list))初始化时传进来的函数, 在/few_shot/下. \
                 #   比如 matching_net_episode.
@@ -204,17 +232,17 @@ class EvaluateFewShot(Callback):
                 logits, reg_logits, loss = self.eval_fn(
                     x=x,
                     y=y,
-                    train=False
+                    prefix=prefix
                 )
                 seen += logits.shape[0]
 
-                totals['loss'] += loss.item() * logits.shape[0]
+                totals[loss_name] += loss.item() * logits.shape[0]
                 totals[metric_name] += categorical_accuracy(y, logits) * logits.shape[0]
 
-        totals['loss'] /= seen
+        totals[loss_name] /= seen
         totals[metric_name] /= seen
         if logs != None:
-            logs[prefix + 'loss'] = totals['loss']
+            logs[loss_name] = totals[loss_name]
             # 注意! 最后的测试准确率就在这里了, 这是在validation上的!
             logs[metric_name] = totals[metric_name]
         if self.verbose:
@@ -238,84 +266,117 @@ class EvaluateFewShot(Callback):
             self.predict_log(epoch, self.test_loader, 'test_', logs)
             self.test_interval_step = 0
 
+        if self.judge_monitor(logs):
+            if self.verbose > 0:
+                # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+                self.logger.info('Saving model.')
+            self.val_best = logs.get(self.val_monitor)
+            torch.save(self.model.state_dict(), self.model_filepath)
+            # save 完model直接测一次.
+            self.predict_log(epoch, self.test_loader, 'test_', logs)
+            # 判断是否需要更新测试集上最好结果:
+            test_current = logs.get(self.test_monitor)
+            if self.test_best == None or self.monitor_op(test_current, self.test_best):
+                self.test_best = test_current
+
     # TODO: 期望logs是记录了所有结果的.
 
-class ModelCheckpoint(Callback):
-    """Save the model after every epoch.
-
-    `model_filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
-    (passed in `on_epoch_end`).
-
-    For example: if `model_filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
-    with the epoch number and the validation loss in the filename.
-
-    # Arguments
-        model_filepath: string, path to save the model file.
-        monitor: quantity to monitor.
-        verbose: verbosity mode, 0 or 1.
-        save_best_only: if `save_best_only=True`,
-            the latest best model according to
-            the quantity monitored will not be overwritten.
-        mode: one of {auto, min, max}.
-            If `save_best_only=True`, the decision
-            to overwrite the current save file is made
-            based on either the maximization or the
-            minimization of the monitored quantity. For `val_acc`,
-            this should be `max`, for `val_loss` this should
-            be `min`, etc. In `auto` mode, the direction is
-            automatically inferred from the name of the monitored quantity.
-        save_weights_only: if True, then only the model's weights will be
-            saved (`model.save_weights(model_filepath)`), else the full model
-            is saved (`model.save(model_filepath)`).
-        period: Interval (number of epochs) between checkpoints.
-    """
-
-    def __init__(self, model_filepath, monitor, save_best_only=True, mode='max', verbose=True):
-        super(ModelCheckpoint, self).__init__()
-        self.model_filepath = model_filepath
-        mkdir(model_filepath[:model_filepath.rfind('/')])
-        self.val_monitor = 'val_' + monitor
-        self.test_monitor = 'test_' + monitor
-        self.save_best_only = save_best_only
-        self.verbose = verbose
-
-        if mode not in ['min', 'max']:
-            raise ValueError('Mode must be one of (min, max).')
-
-        self.val_best, self.test_best = None, None
-
-        if mode == 'min':
-            self.monitor_op = np.less
-        elif mode == 'max':
-            self.monitor_op = np.greater
-    
     def judge_monitor(self, logs):
-        if self.val_best == None or self.test_best == None:
+        """判断当前验证集上是否表现更好:
+    
+        # Argument
+            logs: 验证集当前最好准确率.
+        # Return
+            bool: 是否需要保存模型.
+        """
+        if self.val_best == None:
             return True
-
         val_current = logs.get(self.val_monitor)
         if self.test_monitor in logs.keys():
             test_current = logs.get(self.test_monitor)
-            if self.monitor_op(test_current, self.test_best):
+            if self.test_best != None and self.monitor_op(test_current, self.test_best):
                 if not self.monitor_op(val_current, self.val_best):
                     warnings.warn('测试更好, 但是验证更菜.', RuntimeWarning)
                     self.logger.warning('测试更好, 但是验证更菜.')
                 return True
         else:
             return self.monitor_op(val_current, self.val_best)
+# class ModelCheckpoint(Callback):
+#     """Save the model after every epoch.
+
+#     `model_filepath` can contain named formatting options, which will be filled the value of `epoch` and keys in `logs`
+#     (passed in `on_epoch_end`).
+
+#     For example: if `model_filepath` is `weights.{epoch:02d}-{val_loss:.2f}.hdf5`, then the model checkpoints will be saved
+#     with the epoch number and the validation loss in the filename.
+
+#     # Arguments
+#         model_filepath: string, path to save the model file.
+#         monitor: quantity to monitor.
+#         verbose: verbosity mode, 0 or 1.
+#         save_best_only: if `save_best_only=True`,
+#             the latest best model according to
+#             the quantity monitored will not be overwritten.
+#         mode: one of {auto, min, max}.
+#             If `save_best_only=True`, the decision
+#             to overwrite the current save file is made
+#             based on either the maximization or the
+#             minimization of the monitored quantity. For `val_acc`,
+#             this should be `max`, for `val_loss` this should
+#             be `min`, etc. In `auto` mode, the direction is
+#             automatically inferred from the name of the monitored quantity.
+#         save_weights_only: if True, then only the model's weights will be
+#             saved (`model.save_weights(model_filepath)`), else the full model
+#             is saved (`model.save(model_filepath)`).
+#         period: Interval (number of epochs) between checkpoints.
+#     """
+
+#     def __init__(self, model_filepath, monitor, save_best_only=True, mode='max', verbose=True):
+#         super(ModelCheckpoint, self).__init__()
+#         self.model_filepath = model_filepath
+#         mkdir(model_filepath[:model_filepath.rfind('/')])
+#         self.val_monitor = 'val_' + monitor
+#         self.test_monitor = 'test_' + monitor
+#         self.save_best_only = save_best_only
+#         self.verbose = verbose
+
+#         if mode not in ['min', 'max']:
+#             raise ValueError('Mode must be one of (min, max).')
+
+#         self.val_best, self.test_best = None, None
+
+#         if mode == 'min':
+#             self.monitor_op = np.less
+#         elif mode == 'max':
+#             self.monitor_op = np.greater
+    
+#     def judge_monitor(self, logs):
+#         if self.val_best == None or self.test_best == None:
+#             return True
+
+#         val_current = logs.get(self.val_monitor)
+#         if self.test_monitor in logs.keys():
+#             test_current = logs.get(self.test_monitor)
+#             if self.monitor_op(test_current, self.test_best):
+#                 if not self.monitor_op(val_current, self.val_best):
+#                     warnings.warn('测试更好, 但是验证更菜.', RuntimeWarning)
+#                     self.logger.warning('测试更好, 但是验证更菜.')
+#                 return True
+#         else:
+#             return self.monitor_op(val_current, self.val_best)
 
         
-    def on_epoch_end(self, epoch, logs=None):
-        # TODO: 这里的model_filepath没有嵌入epoch.
-        # model_filepath = self.model_filepath.format(epoch=epoch + 1, **logs)
-        # 为了保证传进来__init__的model_filepath就是最优模型的, 这里不改变model_filepath.
+#     def on_epoch_end(self, epoch, logs=None):
+#         # TODO: 这里的model_filepath没有嵌入epoch.
+#         # model_filepath = self.model_filepath.format(epoch=epoch + 1, **logs)
+#         # 为了保证传进来__init__的model_filepath就是最优模型的, 这里不改变model_filepath.
 
-        if self.judge_monitor(logs):
-            if self.verbose > 0:
-                # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
-                self.logger.info('Saving model.')
-            self.val_best, self.test_best = logs.get(self.val_monitor), logs.get(self.test_monitor)
-            torch.save(self.model.state_dict(), self.model_filepath)
+#         if self.judge_monitor(logs):
+#             if self.verbose > 0:
+#                 # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+#                 self.logger.info('Saving model.')
+#             self.val_best, self.test_best = logs.get(self.val_monitor), logs.get(self.test_monitor)
+#             torch.save(self.model.state_dict(), self.model_filepath)
 
 class CSVLogger(Callback):
     """Callback that streams epoch results to a csv file.
@@ -329,13 +390,13 @@ class CSVLogger(Callback):
             training). False: overwrite existing file,
     """
 
-    def __init__(self, filename, separator=',', append=False):
+    def __init__(self, filename, metric_name, separator=',', append=False):
         self.sep = separator
         self.filename = filename
         mkdir(filename[:filename.rfind('/')])
         self.append = append
         self.writer = None
-        self.keys = None
+        self.keys = [i + j for i in ['val_', 'test_'] for j in ['loss', metric_name]]
         self.append_header = True
         self.file_flags = ''
         self._open_args = {'newline': '\n'}
@@ -364,8 +425,8 @@ class CSVLogger(Callback):
             else:
                 return k
 
-        if self.keys is None:
-            self.keys = sorted(logs.keys())
+        # if self.keys is None:
+        #     self.keys = sorted(logs.keys())
 
         if not self.writer:
             class CustomDialect(csv.excel):
@@ -379,6 +440,8 @@ class CSVLogger(Callback):
 
         row_dict = OrderedDict({'epoch': epoch})
 
+        for i in self.keys:
+            logs[i] = 0 if i not in logs.keys() else logs[i]
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         # row_dict 就是 csv 文件里记录的信息.
         self.writer.writerow(row_dict)
@@ -387,45 +450,3 @@ class CSVLogger(Callback):
     def on_train_end(self, logs=None):
         self.csv_file.close()
         self.writer = None
-
-
-# class LearningRateScheduler(Callback):
-#     """Learning rate scheduler.
-#     # Arguments
-#         schedule: a function that takes an epoch index as input
-#             (integer, indexed from 0) and current learning rate
-#             and returns a new learning rate as output (float).
-#         verbose: int. 0: quiet, 1: update messages.
-#     """
-
-#     def __init__(self, schedule, verbose=True):
-#         super(LearningRateScheduler, self).__init__()
-#         self.schedule = schedule
-#         self.verbose = verbose
-
-#     def on_train_begin(self, logs=None):
-#         self.optimizer = self.params['optimizer']
-
-#     def on_epoch_begin(self, epoch, logs=None):
-#         lrs = [self.schedule(epoch, param_group['lr']) for param_group in self.optimizer.param_groups]
-
-#         if not all(isinstance(lr, (float, np.float32, np.float64)) for lr in lrs):
-#             raise ValueError('The output of the "schedule" function '
-#                              'should be float.')
-#         self.set_lr(epoch, lrs)
-
-#     def on_epoch_end(self, epoch, logs=None):
-#         logs = logs or {}
-#         if len(self.optimizer.param_groups) == 1:
-#             logs['lr'] = self.optimizer.param_groups[0]['lr']
-#         else:
-#             for i, param_group in enumerate(self.optimizer.param_groups):
-#                 logs['lr_{}'.format(i)] = param_group['lr']
-
-#     def set_lr(self, epoch, lrs):
-#         for i, param_group in enumerate(self.optimizer.param_groups):
-#             new_lr = lrs[i]
-#             param_group['lr'] = new_lr
-#             if self.verbose:
-#                 print('Epoch {:5d}: setting learning rate'
-#                       ' of group {} to {:.4e}.'.format(epoch, i, new_lr))

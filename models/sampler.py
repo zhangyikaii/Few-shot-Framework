@@ -28,7 +28,7 @@ class ShotTaskSampler(Sampler):
         # Arguments
             dataset: Instance of torch.utils.data.Dataset from which to draw samples
             episodes_per_epoch: Arbitrary number of batches of shot-shot tasks to generate in one epoch
-            n_shot: int. Number of samples for each class in the shot-shot classification tasks.
+            k_shot: int. Number of samples for each class in the shot-shot classification tasks.
             k_way: int. Number of classes in the shot-shot classification tasks.
             q_queries: int. Number query samples for each class in the shot-shot classification tasks.
             num_tasks: Number of shot-shot tasks to group into a single batch
@@ -63,7 +63,9 @@ class ShotTaskSampler(Sampler):
                 if self.fixed_tasks is None:
                     # Get random classes
                     # 随机sample way 个类:
-                    episode_classes = np.random.choice(self.dataset.df['class_id'].unique(), size=self.way, replace=False)
+                    episode_classes = np.random.choice(self.dataset.df['class_id'].unique(),
+                                                       size=min(self.way, len(self.dataset.df['class_id'].unique())),
+                                                       replace=False)
                     # print("fixed_tasks is None, episode_classes:", episode_classes)
                 else:
                     # Loop through classes in fixed_tasks
@@ -71,12 +73,13 @@ class ShotTaskSampler(Sampler):
                     self.i_task += 1
                 df = self.dataset.df[self.dataset.df['class_id'].isin(episode_classes)]
 
+                # TODO: support和query不要分开来sample.
                 # support_k 字典, <key: way 个class, value: 每个class对应的n个数据.
                 support_k = {way: None for way in episode_classes}
                 for way in episode_classes:
                     # Select support examples
                     # 随机sample shot 个样本, 在之前sample的k类的每类下.
-                    support = df[df['class_id'] == way].sample(self.shot)
+                    support = df[df['class_id'] == way].sample(n=self.shot)
                     support_k[way] = support
 
                     for i, s in support.iterrows():

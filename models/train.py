@@ -6,13 +6,13 @@ from torch.utils.data import DataLoader
 from typing import Callable, List, Union
 import os.path as osp
 import json
+import tqdm
 
 from models.callbacks import (
     ProgressBarLogger,
     CallbackList,
     Callback,
     EvaluateFewShot,
-    ModelCheckpoint,
     CSVLogger
 )
 from models.few_shot.protonet import fit_handle as ProtoNet_fit_handle
@@ -58,15 +58,15 @@ class Trainer(object):
         # 记录数据所需:
         # 这里的params统一传到基类成员, 所有派生类共享. 注意这里一定要精简.
         self.metrics = ['categorical_accuracy']
-        self.prepare_batch = self.model.prepare_nshot_task(args.eval_shot, args.eval_way, 
-            args.eval_query, args.meta_batch_size)
-        self.verbose = args.verbose
+        self.train_prepare_batch = self.model.prepare_kshot_task(args.shot, args.way, 
+            args.query, args.meta_batch_size)
+        self.verbose, self.epoch_verbose = args.verbose, args.epoch_verbose
         self.max_epoch = args.max_epoch
         # self.params = {
         #     'max_epoch': args.max_epoch,
         #     'verbose': args.verbose,
         #     'metrics': (self.metrics or []),
-        #     'prepare_batch': prepare_nshot_task(args.eval_shot, args.eval_way, args.eval_query),
+        #     'prepare_batch': prepare_kshot_task(args.test_shot, args.test_way, args.test_query),
         #     'loss_fn': self.loss_fn,
         #     'optimizer': self.optimizer,
         #     'lr_scheduler': self.lr_scheduler
@@ -74,32 +74,31 @@ class Trainer(object):
 
         # args 是一个参数集合, 期望在这里分模块, 对每个类 对应特定的功能, 类的参数也要**具体化**, 这样才可以一层层分解, 较好.
 
-        self.metric_name = f'{args.eval_shot}-shot_{args.eval_way}-way_acc'
+        self.metric_name = 'ca_acc'
         self.model_filepath = args.model_filepath
         self.train_mode = args.train_mode
 
         self.evaluate_handle = EvaluateFewShot(
             val_loader=self.val_loader,
             test_loader=self.test_loader,
-            prepare_batch=self.prepare_batch,
+            val_prepare_batch=self.model.prepare_kshot_task(args.shot, args.val_way, args.query, args.meta_batch_size),
+            test_prepare_batch=self.model.prepare_kshot_task(args.test_shot, args.test_way, args.test_query, args.meta_batch_size),
             metric_name=self.metric_name,
             eval_fn=self.fit_handle,
-            verbose=self.verbose,
+            test_interval=args.test_interval,
+            model_filepath=self.model_filepath,
+            monitor=self.metric_name,
+            save_best_only=True,
+            mode='max',
             simulation_test=False,
-            test_interval=args.test_interval
+            verbose=self.verbose
         )
         
         callbacks = [
             self.evaluate_handle,
-            ModelCheckpoint(
-                model_filepath=self.model_filepath,
-                monitor=self.metric_name,
-                save_best_only=True,
-                mode='max',
-                verbose=self.verbose
-            ),
             CSVLogger(
                 osp.abspath(osp.dirname(osp.dirname(__file__))) + f'/logs/result/{args.params_str}.csv',
+                metric_name=self.metric_name,
                 separator=',',
                 append=False
             )
@@ -107,7 +106,7 @@ class Trainer(object):
 
         # LearningRateScheduler 最好直接在fit函数里面传一个lr_scheduler, 直接step吧. 看FEAT.
         self.callbacks = CallbackList((callbacks or [])
-                                     + [ProgressBarLogger(length=len(self.train_loader), verbose=self.verbose), ])
+                                     + [ProgressBarLogger(length=len(self.train_loader), verbose=self.epoch_verbose), ])
         self.callbacks.set_model_logger(self.model, self.logger)
 
         """
@@ -154,7 +153,11 @@ class Trainer(object):
         # from torch.utils.tensorboard import SummaryWriter
         # writer = SummaryWriter('runs/model')
 
-        for epoch in range(1, self.max_epoch+1):
+        if not self.epoch_verbose:
+            pbar = tqdm.trange(1, self.max_epoch+1)
+        else:
+            pbar = range(1, self.max_epoch+1)
+        for epoch in pbar:
             self.callbacks.on_epoch_begin(epoch)
             epoch_logs = {}
             for batch_index, batch in enumerate(self.train_loader):
@@ -162,9 +165,9 @@ class Trainer(object):
 
                 self.callbacks.on_batch_begin(batch_index, batch_logs)
 
-                x, y = self.prepare_batch(batch)
+                x, y = self.train_prepare_batch(batch)
 
-                logits, reg_logits, loss = self.fit_handle(x=x, y=y, train=True)
+                logits, reg_logits, loss = self.fit_handle(x=x, y=y, prefix='train_')
                 batch_logs['loss'] = loss.item()
                 # Loops through all metrics
                 batch_logs = self.batch_metrics(logits, y, batch_logs)

@@ -17,19 +17,19 @@ def fit_handle(
     def core(
         x: torch.Tensor,
         y: torch.Tensor,
-        train: bool = True
+        prefix: str = 'train_'
         ):
-        if train:
+        if prefix == 'train_':
             # Zero gradients
             model.train()
             optimizer.zero_grad()
         else:
             model.eval()
 
-        logits, reg_logits = model(x)
+        logits, reg_logits = model(x, prefix)
         loss = loss_fn(logits, y)
 
-        if train:
+        if prefix == 'train_':
             # Take gradient step
             loss.backward()
             optimizer.step()
@@ -48,7 +48,7 @@ class ProtoNet(FewShotModel):
             support: torch.Tensor. Tensor of shape (n * k, d) where d is the embedding
                 dimension.
             k: int. "k-way" i.e. number of classes in the classification task
-            n: int. "n-shot" of the classification task
+            n: int. "k-shot" of the classification task
 
         # Returns
             class_prototypes: Prototypes aka mean embeddings for each class
@@ -58,8 +58,13 @@ class ProtoNet(FewShotModel):
         class_prototypes = support.reshape(k, n, -1).mean(dim=1)
         return class_prototypes
 
-    def _forward(self, support, query):
-        prototypes = self.compute_prototypes(self, support, self.args.way, self.args.shot)
+    def _forward(self, support, query, prefix):
+        if prefix == 'train_':
+            prototypes = self.compute_prototypes(self, support, self.args.way, self.args.shot)
+        elif prefix == 'val_':
+            prototypes = self.compute_prototypes(self, support, self.args.val_way, self.args.shot)
+        elif prefix == 'test_':
+            prototypes = self.compute_prototypes(self, support, self.args.test_way, self.args.test_shot)
 
         # Calculate squared distances between all queries and all prototypes
         # Output should have shape (q_queries * k_way, k_way) = (num_queries, k_way)
@@ -75,11 +80,11 @@ class ProtoNet(FewShotModel):
 
         # organize support/query data
         # 根据下标把support取出来.
-        # view后面是 [1 x n-shot x k-way], 就按照这样的 n-shot, k-way 取出了, 因为前面flatten之后就是没结构的规整的形式了.
+        # view后面是 [1 x k-shot x k-way], 就按照这样的 k-shot, k-way 取出了, 因为前面flatten之后就是没结构的规整的形式了.
         # 很精妙! 因为这样可以保留feature结构.
         support = instance_embs[support_idx.flatten()].view(*(support_idx.shape + (-1,)))
         query   = instance_embs[query_idx.flatten()].view(  *(query_idx.shape   + (-1,)))
-        # support: [1 x n-shot x k-way x feature num]
+        # support: [1 x k-shot x k-way x feature num]
 
         # get mean of the support
         proto = support.mean(dim=1) # Ntask x NK x d

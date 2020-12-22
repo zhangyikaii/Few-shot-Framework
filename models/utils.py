@@ -44,11 +44,12 @@ def get_command_line_parser():
                         choices=['MiniImageNet', 'TieredImageNet', 'CUB', 'OmniglotDataset'])
     parser.add_argument('--distance', default='l2')
     parser.add_argument('--way', type=int, default=5)
-    parser.add_argument('--eval_way', type=int, default=5)
+    parser.add_argument('--val_way', type=int, default=5)
+    parser.add_argument('--test_way', type=int, default=5)
     parser.add_argument('--shot', type=int, default=1)
-    parser.add_argument('--eval_shot', type=int, default=1)
+    parser.add_argument('--test_shot', type=int, default=1)
     parser.add_argument('--query', type=int, default=15)
-    parser.add_argument('--eval_query', type=int, default=15)
+    parser.add_argument('--test_query', type=int, default=15)
     parser.add_argument('--backbone_class', type=str, default='ConvNet',
                         choices=['ConvNet', 'Res12', 'Res18', 'WRN'])
     
@@ -86,12 +87,14 @@ def get_command_line_parser():
     parser.add_argument('--weight_decay', type=float, default=0.0005) # we find this weight decay value works the best
     parser.add_argument('--num_workers', type=int, default=4)
     parser.add_argument('--log_interval', type=int, default=50)
-    parser.add_argument('--eval_interval', type=int, default=1)
+    parser.add_argument('--val_interval', type=int, default=1)
     parser.add_argument('--test_interval', type=int, default=10)
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
     
+    parser.add_argument('--model_save_dir', type=str, default='/mnt/data3/lus/zhangyk/models')
     parser.add_argument('--test_model_filepath', type=str, default=None)
     parser.add_argument('--verbose', action='store_true', default=False)
+    parser.add_argument('--epoch_verbose', action='store_true', default=False)
 
     # MAML:
     parser.add_argument('--meta', action='store_true', default=False)
@@ -150,20 +153,24 @@ def preprocess_args(args):
     elif args.dataset == 'MiniImageNet':
         args.num_input_channels = 3
     
-    from time import gmtime, strftime
-    time_str = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
+    from datetime import datetime
+    args.time_str = datetime.utcnow().strftime('%m%d %H-%M-%S-%f')[:-3]
 
-    args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}' \
-            f'_{args.way}-way_{args.shot}-shot__{args.eval_way}-eval-way_{args.eval_shot}-eval-shot__' \
-            f'{args.query}-query_{args.eval_query}-eval-query_{time_str}'
+    # args.params_str = f'{args.model_class}_{args.dataset}_{args.backbone_class}-backbone_{args.distance}' \
+    #         f'_{args.way}-way_{args.shot}-shot__{args.test_way}-test-way_{args.test_shot}-test-shot__' \
+    #         f'{args.query}-query_{args.test_query}-test-query_{time_str}'
+    args.params_str = f'{args.time_str} {args.model_class} {args.dataset} {args.backbone_class}-backbone {args.distance} ' \
+            f'{args.way}-way {args.val_way}-val-way {args.shot}-shot {args.query}-query ' \
+            f'{args.test_way}-test-way {args.test_shot}-test-shot {args.test_query}-test-query'
+
     args.train_mode = True if args.test_model_filepath is None else False
-    args.model_filepath = f'/mnt/data3/lus/zhangyk/models/{args.model_class}/{args.params_str}.pth' \
+    args.model_filepath = f'{args.model_save_dir}/{args.model_class}/{args.params_str}.pth' \
         if args.test_model_filepath is None else args.test_model_filepath
     # 在此之后 test_model_filepath 没有用了.
 
     return args
 
-def create_nshot_task_label(way: int, query: int) -> torch.Tensor:
+def create_kshot_task_label(way: int, query: int) -> torch.Tensor:
     """Creates an shot-shot task label.
 
     Label has the structure:

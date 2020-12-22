@@ -51,7 +51,7 @@ models.py 里面的encoder()就是backbone.
       -> 参数 prepare_batch (函数) -> 参数 fit_function (函数, 就是例如matching_net_episode, few_shot/ 下面的)
       -> on_batch_end -> on_epoch_end
 
-+ prepare_nshot_task函数(作为prepare_batch参数传入fit)运行结束后, 返回参数 y 并不是one-hot的.
++ prepare_kshot_task函数(作为prepare_batch参数传入fit)运行结束后, 返回参数 y 并不是one-hot的.
     请注意, 该函数返回的:
     x: 是support和query的, 在接下来的 xxx_net_episode 函数中会被切分.
     y: 是仅有support的.
@@ -62,11 +62,11 @@ models.py 里面的encoder()就是backbone.
 
 + 在main文件里, 一个技巧, 期望 dataset_class 根据参数变化(指向不同的类), 通过赋值即可.
 
-+ `ShotTaskSampler` 决定了如何 generates batches of n-shot, k-way, q-query tasks.
++ `ShotTaskSampler` 决定了如何 generates batches of k-shot, k-way, q-query tasks.
 
   `--k-train 20 --n-train 1 --q-train 15` 请注意在训练时候的 `k, n, q` 是这样的.
 
-+ `proto_net_episode` 的参数 `y` 是query set的label. 详见 `prepare_nshot_task`.
++ `proto_net_episode` 的参数 `y` 是query set的label. 详见 `prepare_kshot_task`.
 
 + 纠正过来, 事实是: 训练时候 support 1-shot, query 20-shot.
 
@@ -83,6 +83,8 @@ models.py 里面的encoder()就是backbone.
 
 5. `reg_logits` ?
 
+6. 加速: torch 的 `contiguous()`
+
 
 ## Few-shot-Framework
 
@@ -92,7 +94,7 @@ models.py 里面的encoder()就是backbone.
 
 + 2020-12-5 09:03:12 接下来构建`ProtoNet`
 
-+ 注意, `prepare_nshot_task` 还要再写. 其实就是准备 `y` Label而已.
++ 注意, `prepare_kshot_task` 还要再写. 其实就是准备 `y` Label而已.
 
 + 期望的结果是增加模型后不用改动太多的文件, 即不同该`utils.py`文件
 
@@ -110,7 +112,7 @@ models.py 里面的encoder()就是backbone.
 
 + 复制到 `E:\Few-shot-Framework` 再用git desktop更新.
 
-+ 模型之间不同的有 (在各自模型文件里实现的): 1. `prepare_nshot_task` 函数, 2. `forward` 函数, 3. `fit_handle` 函数, 其中前两个在 `FewShotModel` 类内有一定的继承实现.
++ 模型之间不同的有 (在各自模型文件里实现的): 1. `prepare_kshot_task` 函数, 2. `forward` 函数, 3. `fit_handle` 函数, 其中前两个在 `FewShotModel` 类内有一定的继承实现.
 
 + x = x.reshape(meta_batch_size, shot*way + query*way, num_input_channels, x.shape[-2], x.shape[-1]) 请注意在这里reshap之后的数据顺序是怎么样的.
 
@@ -156,6 +158,30 @@ models.py 里面的encoder()就是backbone.
       return Variable._execution_engine.run_backward(
   RuntimeError: element 0 of tensors does not require grad and does not have a grad_fn
   ```
+
++ TODO: 加入pretrain:
+  
+  看FEAT init_weights 参数.
+
+  加入 multi_gpu 参数.
+
+  TODO: 看一下Adam之类的参数.
+
++ 重要的TODO:
+  
+  Dataloader的sampler方式改成FEAT的.
+
+  看下面的例子图, FEAT的sampler方式就是对于一个取定的class, 一起sampler出这个类下support和query, 然后再划分. 这确实是更好的.
+
+  改成同样的sampler idx.
+
++ TODO:
+  
+  2020-12-22 18:06:12:
+
+  logs 不要在epoch_end创建然后消亡然后传参数.
+
+  
 
 ## Summary
 
@@ -208,6 +234,22 @@ for epoch:
             print(nncross(logits, y))
             print(fcross(logits, y))
             ```
+
+例子:
+# 1-shot, 5-way, 15-query.
+1-shot, 3-way, 2-query.
++----------------------------+
+| class | support |  query   |
+|   1   |   1.3   | 1.4, 1.2 |
+|   3   |   3.2   | 3.1, 3.3 |
+|   6   |   6.5   | 6.4, 6.2 |
++----------------------------+
+一个batch如上.
+同一个class下support样本与query样本不相交.
+support -> 输入得到 3 个原型.
+query和3个原型算距离, 得到 (6 x 3) 距离矩阵. 这6个3维vector, 在3维上那个分量大就属于哪个类.
+y = 6 维: [1, 1, 3, 3, 6, 6] (但在程序里是[1, 1, 2, 2, 3, 3], 因为cross损失传入y计算的是下标).
+  与label具体是啥无关!
 ```
 
 + conv_block:
@@ -264,12 +306,12 @@ for epoch:
     for meta_batch:
       (N x C x H x W)
       for inner_batch 次循环:
-        forward一次, 算loss.
-        算梯度.
-        手动更新网络参数.
-      (这里网络的参数有 conv`x` block 的每一层, 还有个logits)
+        在support上fast_weight functional forward一次, 算loss. 此时有fast_weight.
+        由 fast_weight 算梯度.
+        更新 fast_weight.
+      (这里网络的参数fast_weight有 conv`x` block 的每一层, 还有个logits)
 
-      forward一次, 算loss.
+      在query上fast_weight forward一次, 算loss.
       加入task预测值.
       算梯度, 记录梯度. 这里没有更新网络参数
 
@@ -294,4 +336,17 @@ for epoch:
 
 
 ```
+
++ MAML 分析:
+  
+  $$
+  \begin{array}{l}
+  \min _{\theta} \sum_{\tau_{i} \sim p(\mathcal{T})} \mathcal{L}_{\mathcal{T}_{i}}\left(f_{\theta_{i}^{\prime}}\right) \\
+  \text {where } \theta_{i}^{\prime}=\theta-\alpha \nabla_{\theta} \mathcal{L}_{\mathcal{T}_{i}}\left(f_{\theta}\right)
+  \end{array}
+  $$
+
+  $\theta_{i}^{\prime}$ 是 inner loop 梯度迭代的. MAML仅使用inner最终的权值进行外循环学习.
+
+  inner里面
 

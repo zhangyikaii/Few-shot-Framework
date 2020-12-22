@@ -18,11 +18,11 @@ class TestProtoNets(unittest.TestCase):
         cls.dataset = DummyDataset(samples_per_class=1000, n_classes=20)
 
     def _test_n_k_q_combination(self, n, k, q):
-        n_shot_taskloader = \
+        k_shot_taskloader = \
             DataLoader(self.dataset,
                        batch_sampler=ShotTaskSampler(self.dataset, 100, n, k, q))
 
-        for batch in n_shot_taskloader:
+        for batch in k_shot_taskloader:
             x, y = batch
             break
 

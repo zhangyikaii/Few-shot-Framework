@@ -5,15 +5,15 @@ python ../main.py \
     --episodes_per_val_epoch 40 \
     --model_class MAML \
     --dataset MiniImageNet \
-    --way 5 --eval_way 5 \
-    --shot 1 --eval_shot 1 \
-    --query 5 --eval_query 5 \
+    --way 5 --test_way 5 \
+    --shot 1 --test_shot 1 \
+    --query 5 --test_query 5 \
     --logger_filepath /logs/process \
     --loss_fn F-cross_entropy \
     --lr 0.0001 --lr_mul 10 --lr_scheduler step \
     --step_size 20 \
     --gamma 0.5 \
-    --eval_interval 1 \
+    --val_interval 1 \
     --test_interval 2 \
     --meta \
     --order 1 \

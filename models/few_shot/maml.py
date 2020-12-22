@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from models.metrics import pairwise_distances
-from models.utils import create_nshot_task_label
+from models.utils import create_kshot_task_label
 from models.few_shot.base import FewShotModel
 from models.backbone.blocks import functional_conv_block
 from models.backbone.convnet import conv_block
@@ -57,7 +57,7 @@ def fit_handle_another(
             # Train the model for `inner_train_steps` iterations
             for inner_batch in range(args.inner_train_steps):
                 # Perform update of model weights
-                y = create_nshot_task_label(args.way, args.shot).cuda()
+                y = create_kshot_task_label(args.way, args.shot).cuda()
                 logits = model.functional_forward(x_task_train, fast_weights)
                 loss = loss_fn(logits, y)
                 gradients = torch.autograd.grad(loss, fast_weights.values(), create_graph=create_graph)
@@ -70,7 +70,7 @@ def fit_handle_another(
 
 
             # Do a pass of the model on the validation data from the current task
-            y = create_nshot_task_label(args.way, args.query).to(torch.device("cuda"))
+            y = create_kshot_task_label(args.way, args.query).to(torch.device("cuda"))
             logits = model.functional_forward(x_task_val, fast_weights)
             loss = loss_fn(logits, y)
             loss.backward(retain_graph=True)
@@ -100,7 +100,7 @@ def fit_handle_another(
                 # Dummy pass in order to create `loss` variable
                 # Replace dummy gradients with mean task gradients using hooks
                 logits = model(torch.zeros((args.way, ) + data_shape).to(torch.device("cuda"), dtype=torch.double))
-                loss = loss_fn(logits, create_nshot_task_label(args.way, 1).to(torch.device("cuda")))
+                loss = loss_fn(logits, create_kshot_task_label(args.way, 1).to(torch.device("cuda")))
                 loss.backward()
                 optimizer.step()
 
@@ -144,8 +144,8 @@ def fit_handle(
         args = model.args
         
         # sptsz = args.shot * args.way = 5, qrysz = args.query * args.way = 25.
-        y_spt = create_nshot_task_label(args.way, args.shot).to(torch.device("cuda"))
-        y_qry = create_nshot_task_label(args.way, args.query).to(torch.device("cuda"))
+        y_spt = create_kshot_task_label(args.way, args.shot).to(torch.device("cuda"))
+        y_qry = create_kshot_task_label(args.way, args.query).to(torch.device("cuda"))
 
         losses_q = [0 for _ in range(args.inner_train_steps + 1)]  # losses_q[i] is the loss on step i
         corrects = [0 for _ in range(args.inner_train_steps + 1)]
@@ -234,7 +234,7 @@ def fit_handle(
         #     # Train the model for `inner_train_steps` iterations
         #     for inner_batch in range(args.inner_train_steps):
         #         # Perform update of model weights
-        #         y = create_nshot_task_label(args.way, args.shot).cuda()
+        #         y = create_kshot_task_label(args.way, args.shot).cuda()
         #         logits = model.functional_forward(x_task_train, fast_weights)
         #         loss = loss_fn(logits, y)
         #         gradients = torch.autograd.grad(loss, fast_weights.values(), create_graph=create_graph)
@@ -246,7 +246,7 @@ def fit_handle(
         #         )
 
         #     # Do a pass of the model on the validation data from the current task
-        #     y = create_nshot_task_label(args.way, args.query).cuda()
+        #     y = create_kshot_task_label(args.way, args.query).cuda()
         #     logits = model.functional_forward(x_task_val, fast_weights)
         #     loss = loss_fn(logits, y)
         #     loss.backward(retain_graph=True)
@@ -277,7 +277,7 @@ def fit_handle(
         #         # Dummy pass in order to create `loss` variable
         #         # Replace dummy gradients with mean task gradients using hooks
         #         logits = model(torch.zeros((args.way, ) + x.shape[2:]).to(torch.device("cuda"), dtype=torch.double))
-        #         loss = loss_fn(logits, create_nshot_task_label(args.way, 1).to(torch.device("cuda")))
+        #         loss = loss_fn(logits, create_kshot_task_label(args.way, 1).to(torch.device("cuda")))
         #         loss.backward()
         #         optimizer.step()
 
@@ -326,7 +326,7 @@ class MAML(nn.Module):
 
         self.logits = nn.Linear(1600, args.way)
 
-    def prepare_nshot_task(self, shot: int, way: int, query: int, meta_batch_size: int) -> Callable:
+    def prepare_kshot_task(self, shot: int, way: int, query: int, meta_batch_size: int) -> Callable:
         def prepare_meta_batch_(batch):
             x, y = batch
             # Reshape to `meta_batch_size` number of tasks. Each task contains
@@ -340,7 +340,7 @@ class MAML(nn.Module):
             # Move to device
             x = x.double().cuda()
             # Create label
-            y = create_nshot_task_label(way, query).cuda().repeat(meta_batch_size)
+            y = create_kshot_task_label(way, query).cuda().repeat(meta_batch_size)
             # y shape: 一列, way个query, 重复meta_batch_size次, 一共 query*way*meta_batch_size个.
             return x, y
 
