@@ -6,3 +6,18 @@ I extended it from [FEAT](https://github.com/Sha-Lab/FEAT), [few-shot](https://g
 I am very grateful to you.
 
 :rice: UPDATING...
+
+&nbsp;
+
+```
+@misc{Few-shot Framework,
+  author = {Yikai Zhang},
+  title = {Few-Shot Learning Framework},
+  year = {2020},
+  publisher = {GitHub},
+  journal = {GitHub repository},
+  howpublished = {\url{https://github.com/ZhangYikaii/Few-shot-Framework}},
+  commit = {main}
+}
+```
+
