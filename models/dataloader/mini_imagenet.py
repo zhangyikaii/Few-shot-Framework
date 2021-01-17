@@ -120,7 +120,7 @@ class MiniImageNet(Dataset):
                 ]
 
         # Transformation
-        if args.backbone_class == 'ConvNet':
+        if args.backbone_class == 'ConvNet' or args.backbone_class == 'Linear':
             self.transform = transforms.Compose(
                 transforms_list + [
                 transforms.Normalize(np.array([0.485, 0.456, 0.406]),
@@ -143,7 +143,7 @@ class MiniImageNet(Dataset):
                 transforms_list + [
                 transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-            ])         
+            ])
         else:
             raise ValueError('Non-supported Network Types. Please Revise Data Pre-Processing Scripts.')
 
@@ -200,15 +200,14 @@ def get_dataloader(args):
                 query=query,
                 num_tasks=args.meta_batch_size,
             ),
-            num_workers=4,
+            num_workers=args.num_workers,
             pin_memory=True
         )
         return taskloader
-
     train_taskloader, val_taskloader, test_taskloader = \
-        taskloader('train', args, args.shot, args.way, args.query, args.episodes_per_epoch), \
+        taskloader('train', args, args.shot, args.way, args.query, args.episodes_per_train_epoch), \
         taskloader('val', args, args.shot, args.val_way, args.query, args.episodes_per_val_epoch), \
-        taskloader('test', args, args.test_shot, args.test_way, args.test_query, args.episodes_per_val_epoch)
+        taskloader('test', args, args.test_shot, args.test_way, args.test_query, args.episodes_per_test_epoch)
 
     # return {'train': train_taskloader, 'val': val_taskloader, 'test': test_taskloader}
     return train_taskloader, val_taskloader, test_taskloader

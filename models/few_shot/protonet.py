@@ -8,12 +8,14 @@ from torch.optim import Optimizer
 from typing import Callable
 
 
+# train/val的逻辑, 与模型方法相关.
 # 写一个两层的函数, model之类先传
 def fit_handle(
     model: nn,
     optimizer: Optimizer,
     loss_fn: Callable
     ):
+    # 返回core函数:
     def core(
         x: torch.Tensor,
         y: torch.Tensor,

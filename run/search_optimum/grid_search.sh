@@ -1,5 +1,4 @@
-python ../main.py \
-    --max_epoch 200 \
+python grid_search.py \
     --gpu 4 \
     --model_class ProtoNet \
     --distance l2 \

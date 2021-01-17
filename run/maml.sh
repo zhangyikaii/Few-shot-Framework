@@ -1,14 +1,14 @@
 python ../main.py \
     --gpu 15 \
     --max_epoch 50 \
-    --episodes_per_epoch 400 \
+    --episodes_per_train_epoch 400 \
     --episodes_per_val_epoch 40 \
     --model_class MAML \
     --dataset MiniImageNet \
     --way 5 --test_way 5 \
     --shot 1 --test_shot 1 \
     --query 5 --test_query 5 \
-    --logger_filepath /logs/process \
+    --logger_filename /logs \
     --loss_fn F-cross_entropy \
     --lr 0.0001 --lr_mul 10 --lr_scheduler step \
     --step_size 20 \

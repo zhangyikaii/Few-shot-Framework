@@ -102,7 +102,18 @@ class ResNet(nn.Module):
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, drop_rate, drop_block, block_size))
+        # inplanes, planes, stride=1, downsample=None, drop_rate=0.0, drop_block=False, block_size=1
+        layers.append(
+            block(
+                inplanes=self.inplanes,
+                planes=planes,
+                stride=stride,
+                downsample=downsample,
+                drop_rate=drop_rate,
+                drop_block=drop_block,
+                block_size=block_size
+            )
+        )
         self.inplanes = planes * block.expansion
 
         return nn.Sequential(*layers)

@@ -1,6 +1,5 @@
 import torch
 
-
 # 算精确度就在这里, TODO: 加个长度的assert.
 def categorical_accuracy(y, y_pred):
     """Calculates categorical accuracy.

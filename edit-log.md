@@ -181,7 +181,8 @@ models.py 里面的encoder()就是backbone.
 
   logs 不要在epoch_end创建然后消亡然后传参数.
 
-  
+  `ctrl + c` 后捕获异常, 自动删除log文件.
+
 
 ## Summary
 
@@ -234,7 +235,7 @@ for epoch:
             print(nncross(logits, y))
             print(fcross(logits, y))
             ```
-
+prototype
 例子:
 # 1-shot, 5-way, 15-query.
 1-shot, 3-way, 2-query.
@@ -253,7 +254,7 @@ y = 6 维: [1, 1, 3, 3, 6, 6] (但在程序里是[1, 1, 2, 2, 3, 3], 因为cross
 ```
 
 + conv_block:
-  
+
   ```python
   def conv_block(in_channels, out_channels):
     return nn.Sequential(
@@ -350,3 +351,7 @@ for epoch:
 
   inner里面
 
+
++ 2021-1-17:
+
+  model 的 dtype 是double吗?

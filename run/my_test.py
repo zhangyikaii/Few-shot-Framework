@@ -49,41 +49,39 @@
 # y = torch.LongTensor(
 #     [4, 3, 2]
 # )
-# logits_simple = torch.FloatTensor(
-#     [
-#         [-0.1, -0.2],
-#         [-0.3, -0.4],
-#         [-0.3, -0.2],
-#     ]
-# )
-# y_simple = torch.LongTensor(
-#     [0, 1, 0]
-# )
+
 # nllloss = torch.nn.NLLLoss()
 # nncross = nn.CrossEntropyLoss()
 # fcross = F.cross_entropy
+# bceloss = torch.nn.BCELoss()
 
-
-# print(nllloss(logits_simple, y_simple))
-# print(nn.LogSoftmax(dim=1)(logits_simple))
-# print(nllloss(nn.LogSoftmax(dim=1)(logits_simple), y_simple))
-# assert 0
-
-# print(nllloss(logits, y))
-# print(nn.LogSoftmax(dim=1)(logits))
+# # print(nllloss(logits, y))
+# # print(nn.LogSoftmax(dim=1)(logits))
 # print(nllloss(nn.LogSoftmax(dim=1)(logits), y))
 # print(nncross(logits, y))
 # print(fcross(logits, y))
-
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 y = torch.LongTensor(
     [5, 3, 8, 4, 4, 2, 3]
 )
-num_class = len(set(y))
-output = torch.argsort(y)
-print(output)
+
+from sklearn import preprocessing
+le = preprocessing.LabelEncoder()
+le.fit([1, 2, 2, 6])
+
+print(le.classes_)
+
+le.transform([1, 1, 2, 6])
+
+le.inverse_transform([0, 0, 1, 2])
+
+
+# y_unique = torch.unique(y, sorted=True)
+# trans_dict = dict(zip(y_unique.tolist(), [*range(len(y_unique))]))
+# output = torch.tensor([trans_dict[i.item()] for i in y])
+
+# print(output)

@@ -29,12 +29,12 @@ class CallbackList(object):
     def __init__(self, callbacks):
         self.callbacks = [c for c in callbacks]
 
-    def set_model_logger(self, model, logger):
+    def set_model_and_logger(self, model, logger):
         for callback in self.callbacks:
             # 每个对象设置到当前model.
             # 真正要看是怎么set_model的, 包括下面的 callback.操作函数 , 都要进到具体的对象里面看.
 
-            callback.set_model_logger(model, logger)
+            callback.set_model_and_logger(model, logger)
 
     def on_epoch_begin(self, epoch, logs=None):
         """Called at the start of an epoch.
@@ -94,7 +94,7 @@ class Callback(object):
     def __init__(self):
         self.model = None
         self.logger = None
-    def set_model_logger(self, model, logger):
+    def set_model_and_logger(self, model, logger):
         self.model = model
         self.logger = logger
     def on_epoch_begin(self, epoch, logs=None):
@@ -171,7 +171,7 @@ class EvaluateFewShot(Callback):
                  eval_fn: Callable,
                  metric_name: str,
                  test_interval: int,
-                 model_filepath, monitor, save_best_only=True, mode='max',
+                 model_filepath, model_filepath_test_best, monitor, save_best_only=True, mode='max',
                  simulation_test: bool = False,
                  verbose: bool = True
                  ):
@@ -189,6 +189,8 @@ class EvaluateFewShot(Callback):
         # model check point:
         self.model_filepath = model_filepath
         mkdir(model_filepath[:model_filepath.rfind('/')])
+        self.model_filepath_test_best = model_filepath_test_best
+        mkdir(model_filepath_test_best[:model_filepath_test_best.rfind('/')])
         self.val_monitor = 'val_' + monitor
         self.test_monitor = 'test_' + monitor
         self.save_best_only = save_best_only
@@ -222,7 +224,7 @@ class EvaluateFewShot(Callback):
                 #   比如 matching_net_episode.
 
                 # on_epoch_end 这里的: \
-                #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model_logger 里面设置的model, \
+                #   这里看 诸如matching_net_episode 的传参是什么, 请注意传的model就是 set_model_and_logger 里面设置的model, \
                 #   实际上就是! fit 函数时传进来的model. 这个model就是在models.py里面定义的.
                 # 注意这里的传参逻辑一定要搞清楚.
                 
@@ -252,11 +254,10 @@ class EvaluateFewShot(Callback):
             # self.logger.info(prefix + 'loss: %f, ' % totals['loss'] 
             #     + metric_name + ': %f.' % totals[metric_name])
 
-            # 算了, 后面CSV会输到文件里.
-            pass
-            self.logger.info('Epoch: %d ' % epoch + prefix + ' accuracy: %f.' % totals[metric_name])
+            self.logger.info('Epoch: %d ' % epoch + prefix + ' accuracy: {%f}' % totals[metric_name])
             if prefix == 'test_':
-                print('Epoch: %d ' % epoch + prefix + ' accuracy: %f.' % totals[metric_name])
+                print('Epoch: %d ' % epoch + prefix + ' accuracy: {%f}.' % totals[metric_name])
+        return totals[metric_name]
 
     # 在测试数据上val: 注意这里进来是evaluation文件夹下的数据, 前面训练的是background文件夹下面的数据.
     def on_epoch_end(self, epoch, logs=None):
@@ -267,17 +268,22 @@ class EvaluateFewShot(Callback):
             self.test_interval_step = 0
 
         if self.judge_monitor(logs):
-            if self.verbose > 0:
-                # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
-                self.logger.info('Saving model.')
+            # if self.verbose > 0:
+            #     # print('\nEpoch %d: saving model to [%s].' % (epoch + 1, self.model_filepath))
+            #     self.logger.info('Saving model.')
             self.val_best = logs.get(self.val_monitor)
             torch.save(self.model.state_dict(), self.model_filepath)
-            # save 完model直接测一次.
-            self.predict_log(epoch, self.test_loader, 'test_', logs)
-            # 判断是否需要更新测试集上最好结果:
-            test_current = logs.get(self.test_monitor)
-            if self.test_best == None or self.monitor_op(test_current, self.test_best):
-                self.test_best = test_current
+            self.logger.info('Saving val_best model.')
+
+            # # save 完model直接测一次.
+            # self.predict_log(epoch, self.test_loader, 'test_', logs)
+            # # 判断是否需要更新测试集上最好结果:
+            # test_current = logs.get(self.test_monitor)
+            # if self.test_best == None or self.monitor_op(test_current, self.test_best):
+            #     self.test_best = test_current
+            #     torch.save(self.model.state_dict(), self.model_filepath_test_best)
+            #     if self.verbose > 0:
+            #         self.logger.info('Saving test_best model.')
 
     # TODO: 期望logs是记录了所有结果的.
 

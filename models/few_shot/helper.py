@@ -33,11 +33,8 @@ class PrepareFunc(object):
 
         if self.args.multi_gpu:
             model.encoder = nn.DataParallel(model.encoder, dim=0)
-            para_model = model.to(self.device, dtype=torch.double)
-        else:
-            para_model = model.to(self.device, dtype=torch.double)
 
-        return model, para_model
+        return model
 
     def prepare_optimizer(self, model):
         top_para = [v for k,v in model.named_parameters() if ('encoder' not in k and 'args' not in k)]
