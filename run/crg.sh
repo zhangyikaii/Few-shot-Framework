@@ -1,0 +1,26 @@
+source activate zykycy
+python ../main.py \
+    --do_train \
+    --do_test \
+    --meta_batch_size 1 \
+    --data_path /mnt/data3/lus/zhangyk/data \
+    --max_epoch 200 \
+    --gpu 1 \
+    --model_class ProtoNet \
+    --distance l2 \
+    --backbone_class Conv3d2Res18 \
+    --dataset LRW \
+    --train_way 5 --val_way 5 --test_way 5 \
+    --train_shot 1 --val_shot 1 --test_shot 1 \
+    --train_query 15 --val_query 15 --test_query 15 \
+    --logger_filename /logs \
+    --temperature 64 \
+    --lr 0.001 --lr_mul 10 --lr_scheduler step \
+    --step_size 10 \
+    --gamma 0.4 \
+    --val_interval 1 \
+    --test_interval 0 \
+    --loss_fn nn-cross_entropy \
+    --grad_scaler \
+    --epoch_verbose \
+    --verbose \

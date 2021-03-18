@@ -1,0 +1,379 @@
+{'augment': False,
+ 'backbone_class': 'ConvNet',
+ 'balance': 1.0,
+ 'batch_size': 16,
+ 'cuda_seed': 929,
+ 'data_path': '/mnt/data3/lus/zhangyk/data/ye',
+ 'dataset': 'MiniImageNet',
+ 'distance': 'l2',
+ 'drop_lr_every': 40,
+ 'episodes_per_test_epoch': 10000,
+ 'episodes_per_train_epoch': 200,
+ 'episodes_per_val_epoch': 200,
+ 'epoch_verbose': False,
+ 'fce': False,
+ 'fix_BN': False,
+ 'gamma': 0.4,
+ 'gpu': '2',
+ 'init_weights': None,
+ 'inner_lr': 0.4,
+ 'inner_train_steps': 1,
+ 'inner_val_steps': 3,
+ 'log_interval': 50,
+ 'logger_filename': '/logs',
+ 'loss_fn': 'nn-cross_entropy',
+ 'lr': 0.001,
+ 'lr_mul': 10.0,
+ 'lr_scheduler': 'step',
+ 'matching_lstm_layers': 1,
+ 'matching_unrolling_steps': 2,
+ 'max_epoch': 200,
+ 'meta': False,
+ 'meta_batch_size': 1,
+ 'meta_lr': 0.001,
+ 'metric_func': 'categorical_accuracy',
+ 'metrics': 'categorical_accuracy',
+ 'model_class': 'ProtoNet',
+ 'model_filepath': '/mnt/data3/lus/zhangyk/models/ProtoNet/0222 14-50-20-983 '
+                   'ProtoNet MiniImageNet ConvNet-backbone l2 '
+                   '5-1-15_train-w-s-q 5-1-15_val-w-s-q 5-1-15_test-w-s-q.pth',
+ 'model_filepath_test_best': '/mnt/data3/lus/zhangyk/models/ProtoNet/test_best/0222 '
+                             '14-50-20-983 ProtoNet MiniImageNet '
+                             'ConvNet-backbone l2 5-1-15_train-w-s-q '
+                             '5-1-15_val-w-s-q 5-1-15_test-w-s-q.pth',
+ 'model_save_path': '/mnt/data3/lus/zhangyk/models',
+ 'mom': 0.9,
+ 'np_seed': 929,
+ 'num_input_channels': 3,
+ 'num_tasks': 4,
+ 'num_workers': 4,
+ 'order': 1,
+ 'orig_imsize': -1,
+ 'params_str': '0222 14-50-20-983 ProtoNet MiniImageNet ConvNet-backbone l2 '
+               '5-1-15_train-w-s-q 5-1-15_val-w-s-q 5-1-15_test-w-s-q',
+ 'pretrain_mode': False,
+ 'relation_hidden_dim': 8,
+ 'save_dir': './checkpoints',
+ 'simpleshot': False,
+ 'simpleshot_episodes_per_epoch': 100,
+ 'simpleshot_num_nn': 1,
+ 'step_size': '30',
+ 'temperature': 64.0,
+ 'temperature2': 16.0,
+ 'test_interval': 0,
+ 'test_model_filepath': None,
+ 'test_query': 15,
+ 'test_shot': 1,
+ 'test_way': 5,
+ 'time_str': '0222 14-50-20-983',
+ 'torch_seed': 929,
+ 'train_mode': True,
+ 'train_query': 15,
+ 'train_shot': 1,
+ 'train_way': 5,
+ 'val_interval': 1,
+ 'val_query': 15,
+ 'val_shot': 1,
+ 'val_way': 5,
+ 'verbose': True,
+ 'weight_decay': 0.0005,
+ 'z_comment': 'Here are some comments for the current training process.'}
+Begin training...
+Epoch: 1:
+{'categorical_accuracy': 0.28913333333333324, 'val_loss': 0.007841465693712234}
+Best val_ accuracy: 0.2891.
+ETA: 7m -> 24.8h.
+
+Epoch: 2:
+{'categorical_accuracy': 0.28999999999999987, 'val_loss': 0.007847386330366135}
+Best val_ accuracy: 0.2900.
+ETA: 17m -> 27.9h.
+
+Epoch: 3:
+{'categorical_accuracy': 0.30486666666666645, 'val_loss': 0.007782581514120102}
+Best val_ accuracy: 0.3049.
+ETA: 30m -> 32.9h.
+
+Epoch: 4:
+{'categorical_accuracy': 0.3069333333333332, 'val_loss': 0.007789637303352356}
+Best val_ accuracy: 0.3069.
+ETA: 43m -> 36.1h.
+
+Epoch: 5:
+{'categorical_accuracy': 0.31413333333333315, 'val_loss': 0.007701478064060211}
+Best val_ accuracy: 0.3141.
+ETA: 57m -> 37.9h.
+
+Epoch: 6:
+{'categorical_accuracy': 0.3148666666666665, 'val_loss': 0.007731758508086205}
+Best val_ accuracy: 0.3149.
+ETA: 1.2h -> 39.0h.
+
+Epoch: 7:
+{'categorical_accuracy': 0.30639999999999995, 'val_loss': 0.007732410129904746}
+ETA: 1.4h -> 39.9h.
+
+Epoch: 8:
+{'categorical_accuracy': 0.3276666666666665, 'val_loss': 0.0077063994377851485}
+Best val_ accuracy: 0.3277.
+ETA: 1.6h -> 39.9h.
+
+Epoch: 9:
+{'categorical_accuracy': 0.32099999999999995, 'val_loss': 0.007786480700969696}
+ETA: 1.8h -> 40.3h.
+
+Epoch: 10:
+{'categorical_accuracy': 0.34439999999999993, 'val_loss': 0.007571355912089348}
+Best val_ accuracy: 0.3444.
+ETA: 2.0h -> 40.7h.
+
+Epoch: 11:
+{'categorical_accuracy': 0.34086666666666643, 'val_loss': 0.007562100979685783}
+ETA: 2.2h -> 40.8h.
+
+Epoch: 12:
+{'categorical_accuracy': 0.34506666666666663, 'val_loss': 0.007502544477581978}
+Best val_ accuracy: 0.3451.
+ETA: 2.5h -> 40.9h.
+
+Epoch: 13:
+{'categorical_accuracy': 0.37699999999999995, 'val_loss': 0.0072865204364061355}
+Best val_ accuracy: 0.3770.
+ETA: 2.7h -> 41.0h.
+
+Epoch: 14:
+{'categorical_accuracy': 0.35479999999999995, 'val_loss': 0.00751437655389309}
+ETA: 2.9h -> 40.9h.
+
+Epoch: 15:
+{'categorical_accuracy': 0.3732, 'val_loss': 0.007353695172071457}
+ETA: 3.1h -> 40.7h.
+
+Epoch: 16:
+{'categorical_accuracy': 0.3555333333333334, 'val_loss': 0.007530513626337051}
+ETA: 3.2h -> 40.6h.
+
+Epoch: 17:
+{'categorical_accuracy': 0.3970666666666666, 'val_loss': 0.0071352315142750745}
+Best val_ accuracy: 0.3971.
+ETA: 3.4h -> 40.3h.
+
+Epoch: 18:
+{'categorical_accuracy': 0.3614, 'val_loss': 0.007465973579883576}
+ETA: 3.6h -> 40.1h.
+
+Epoch: 19:
+{'categorical_accuracy': 0.3681999999999997, 'val_loss': 0.007393594914674759}
+ETA: 3.8h -> 40.1h.
+
+Epoch: 20:
+{'categorical_accuracy': 0.38153333333333345, 'val_loss': 0.007284089732170105}
+ETA: 4.0h -> 40.1h.
+
+Epoch: 21:
+{'categorical_accuracy': 0.3656000000000001, 'val_loss': 0.007426429086923599}
+ETA: 4.2h -> 40.2h.
+
+Epoch: 22:
+{'categorical_accuracy': 0.3736666666666666, 'val_loss': 0.007256625831127167}
+ETA: 4.4h -> 40.1h.
+
+Epoch: 23:
+{'categorical_accuracy': 0.3874666666666664, 'val_loss': 0.007239374813437461}
+ETA: 4.6h -> 40.0h.
+
+Epoch: 24:
+{'categorical_accuracy': 0.38659999999999967, 'val_loss': 0.007201077300310135}
+ETA: 4.8h -> 39.9h.
+
+Epoch: 25:
+{'categorical_accuracy': 0.4002000000000002, 'val_loss': 0.00708961718082428}
+Best val_ accuracy: 0.4002.
+ETA: 5.0h -> 39.7h.
+
+Epoch: 26:
+{'categorical_accuracy': 0.38773333333333343, 'val_loss': 0.007142155316472053}
+ETA: 5.1h -> 39.5h.
+
+Epoch: 27:
+{'categorical_accuracy': 0.38133333333333325, 'val_loss': 0.007283085197210311}
+ETA: 5.3h -> 39.1h.
+
+Epoch: 28:
+{'categorical_accuracy': 0.3899999999999999, 'val_loss': 0.007223833039402962}
+ETA: 5.4h -> 38.9h.
+
+Epoch: 29:
+{'categorical_accuracy': 0.4150000000000001, 'val_loss': 0.006994028487801551}
+Best val_ accuracy: 0.4150.
+ETA: 5.6h -> 38.7h.
+
+Epoch: 30:
+{'categorical_accuracy': 0.4020666666666667, 'val_loss': 0.007099624481797219}
+ETA: 5.8h -> 38.4h.
+
+Epoch: 31:
+{'categorical_accuracy': 0.41120000000000034, 'val_loss': 0.006970144972205162}
+ETA: 5.9h -> 38.1h.
+
+Epoch: 32:
+{'categorical_accuracy': 0.4203333333333331, 'val_loss': 0.006901796436309815}
+Best val_ accuracy: 0.4203.
+ETA: 6.1h -> 37.9h.
+
+Epoch: 33:
+{'categorical_accuracy': 0.4215333333333335, 'val_loss': 0.006851265245676041}
+Best val_ accuracy: 0.4215.
+ETA: 6.2h -> 37.6h.
+
+Epoch: 34:
+{'categorical_accuracy': 0.41440000000000005, 'val_loss': 0.006997524367272853}
+ETA: 6.4h -> 37.4h.
+
+Epoch: 35:
+{'categorical_accuracy': 0.40179999999999977, 'val_loss': 0.007079432305693626}
+ETA: 6.5h -> 37.1h.
+
+Epoch: 36:
+{'categorical_accuracy': 0.4157333333333329, 'val_loss': 0.006899939538538455}
+ETA: 6.6h -> 36.8h.
+
+Epoch: 37:
+{'categorical_accuracy': 0.41526666666666634, 'val_loss': 0.006900227621197701}
+ETA: 6.8h -> 36.6h.
+
+Epoch: 38:
+{'categorical_accuracy': 0.43539999999999973, 'val_loss': 0.006721790699660778}
+Best val_ accuracy: 0.4354.
+ETA: 6.9h -> 36.3h.
+
+Epoch: 39:
+{'categorical_accuracy': 0.42873333333333313, 'val_loss': 0.006775238825380803}
+ETA: 7.0h -> 36.0h.
+
+Epoch: 40:
+{'categorical_accuracy': 0.42099999999999965, 'val_loss': 0.006817943546175956}
+ETA: 7.2h -> 35.8h.
+
+Epoch: 41:
+{'categorical_accuracy': 0.41053333333333325, 'val_loss': 0.006908993411064148}
+ETA: 7.3h -> 35.6h.
+
+Epoch: 42:
+{'categorical_accuracy': 0.4300666666666666, 'val_loss': 0.006810779224336147}
+ETA: 7.4h -> 35.3h.
+
+Epoch: 43:
+{'categorical_accuracy': 0.42486666666666667, 'val_loss': 0.006879299362003804}
+ETA: 7.5h -> 35.1h.
+
+Epoch: 44:
+{'categorical_accuracy': 0.4176666666666665, 'val_loss': 0.0068705991789698604}
+ETA: 7.7h -> 34.9h.
+
+Epoch: 45:
+{'categorical_accuracy': 0.4236000000000002, 'val_loss': 0.0067952799603343}
+ETA: 7.8h -> 34.7h.
+
+Epoch: 46:
+{'categorical_accuracy': 0.43333333333333324, 'val_loss': 0.006714641919732094}
+ETA: 7.9h -> 34.5h.
+
+Epoch: 47:
+{'categorical_accuracy': 0.4191333333333332, 'val_loss': 0.006911908115446568}
+ETA: 8.0h -> 34.2h.
+
+Epoch: 48:
+{'categorical_accuracy': 0.42433333333333306, 'val_loss': 0.00685635574311018}
+ETA: 8.2h -> 34.0h.
+
+Epoch: 49:
+{'categorical_accuracy': 0.42546666666666666, 'val_loss': 0.006856698690354824}
+ETA: 8.3h -> 33.8h.
+
+Epoch: 50:
+{'categorical_accuracy': 0.45393333333333297, 'val_loss': 0.006615640443563461}
+Best val_ accuracy: 0.4539.
+ETA: 8.4h -> 33.6h.
+
+Epoch: 51:
+{'categorical_accuracy': 0.44053333333333305, 'val_loss': 0.006709404738247394}
+ETA: 8.5h -> 33.4h.
+
+Epoch: 52:
+{'categorical_accuracy': 0.42046666666666654, 'val_loss': 0.006830718626081943}
+ETA: 8.6h -> 33.2h.
+
+Epoch: 53:
+{'categorical_accuracy': 0.4172666666666665, 'val_loss': 0.006839125119149685}
+ETA: 8.8h -> 33.0h.
+
+Epoch: 54:
+{'categorical_accuracy': 0.42266666666666686, 'val_loss': 0.006796989627182484}
+ETA: 8.9h -> 32.8h.
+
+Epoch: 55:
+{'categorical_accuracy': 0.4203333333333331, 'val_loss': 0.0069156951934099195}
+ETA: 9.0h -> 32.6h.
+
+Epoch: 56:
+{'categorical_accuracy': 0.43439999999999984, 'val_loss': 0.00676326387822628}
+ETA: 9.1h -> 32.4h.
+
+Epoch: 57:
+{'categorical_accuracy': 0.4281333333333334, 'val_loss': 0.006835315661132335}
+ETA: 9.2h -> 32.2h.
+
+Epoch: 58:
+{'categorical_accuracy': 0.42193333333333305, 'val_loss': 0.006758678586781025}
+ETA: 9.3h -> 32.0h.
+
+Epoch: 59:
+{'categorical_accuracy': 0.4243333333333333, 'val_loss': 0.006849046815931797}
+ETA: 9.4h -> 31.8h.
+
+Epoch: 60:
+{'categorical_accuracy': 0.4330666666666669, 'val_loss': 0.0067425119176507}
+ETA: 9.5h -> 31.6h.
+
+Epoch: 61:
+{'categorical_accuracy': 0.4384666666666665, 'val_loss': 0.0067188984706997865}
+ETA: 9.6h -> 31.5h.
+
+Epoch: 62:
+{'categorical_accuracy': 0.45786666666666664, 'val_loss': 0.006607010073959827}
+Best val_ accuracy: 0.4579.
+ETA: 9.7h -> 31.3h.
+
+Epoch: 63:
+{'categorical_accuracy': 0.4530000000000004, 'val_loss': 0.006501102152466774}
+ETA: 9.8h -> 31.2h.
+
+Epoch: 64:
+{'categorical_accuracy': 0.4445999999999998, 'val_loss': 0.006601106885075569}
+ETA: 9.9h -> 31.0h.
+
+Epoch: 65:
+{'categorical_accuracy': 0.4425333333333332, 'val_loss': 0.00657494885623455}
+ETA: 10.0h -> 30.9h.
+
+Epoch: 66:
+{'categorical_accuracy': 0.43833333333333335, 'val_loss': 0.006676007236540318}
+ETA: 10.1h -> 30.7h.
+
+Epoch: 67:
+{'categorical_accuracy': 0.4458000000000002, 'val_loss': 0.00662406497746706}
+ETA: 10.2h -> 30.6h.
+
+Epoch: 68:
+{'categorical_accuracy': 0.4467999999999998, 'val_loss': 0.006579910580813884}
+ETA: 10.4h -> 30.5h.
+
+Epoch: 69:
+{'categorical_accuracy': 0.44720000000000026, 'val_loss': 0.006590962658822537}
+ETA: 10.5h -> 30.4h.
+
+Epoch: 70:
+{'categorical_accuracy': 0.4361333333333332, 'val_loss': 0.006684724381566047}
+ETA: 10.7h -> 30.4h.
+
