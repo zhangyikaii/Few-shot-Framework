@@ -1,0 +1,28 @@
+source activate zykycy
+python ../main.py \
+    --do_train \
+    --do_test \
+    --meta_batch_size 1 \
+    --data_path /mnt/data3/lus/zhangyk/data \
+    --max_epoch 200 \
+    --gpu 6 \
+    --model_class ProtoNet \
+    --distance l2 \
+    --backbone_class Res12 \
+    --dataset MiniImageNet \
+    --train_way 5 --val_way 5 --test_way 5 \
+    --train_shot 1 --val_shot 1 --test_shot 1 \
+    --train_query 15 --val_query 15 --test_query 15 \
+    --logger_filename /logs \
+    --temperature 128 \
+    --mom 0.95 --weight_decay 0.0005 \
+    --lr 0.00001 --lr_mul 10 \
+    --lr_scheduler step \
+    --step_size 50 \
+    --gamma 0.8 \
+    --val_interval 1 \
+    --test_interval 0 \
+    --loss_fn nn-cross_entropy \
+    --do_prefetch \
+    --verbose \
+    --init_weights /home/lus/zhangyk/pre_trained_weights \
