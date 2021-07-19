@@ -8,7 +8,7 @@ python ../main.py \
     --gpu 1 \
     --model_class ProtoNet \
     --distance l2 \
-    --backbone_class Conv3d2Res18 \
+    --backbone_class Conv3dRes18GRU \
     --dataset LRW \
     --train_way 5 --val_way 5 --test_way 5 \
     --train_shot 1 --val_shot 1 --test_shot 1 \

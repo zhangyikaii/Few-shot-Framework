@@ -5,7 +5,6 @@ import torch
 import numpy as np
 import glob
 import time
-import cv2
 import os
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -13,7 +12,6 @@ import torch
 from tqdm import tqdm
 
 jpeg = TurboJPEG()
-print("OK")
 def extract_opencv(filename):
     video = []
     cap = cv2.VideoCapture(filename)
@@ -27,7 +25,6 @@ def extract_opencv(filename):
             break
     cap.release()
     return video
-
 
 target_dir = '/mnt/data3/lus/zhangyk/data/lrw_roi_80_116_175_211_npy_gray_pkl_jpeg'
 

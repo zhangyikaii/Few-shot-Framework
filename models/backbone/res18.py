@@ -99,7 +99,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
-        self.bn2 = nn.BatchNorm1d(512)
+        self.bn = nn.BatchNorm1d(512)
         
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -160,10 +160,8 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        x = self.bn2(x)
+        x = self.bn(x)
         return x
-
-
 
 def resnet10(**kwargs):
     """Constructs a ResNet-10 model.

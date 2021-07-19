@@ -1,0 +1,26 @@
+source activate zykycy
+python ../main.py \
+    --do_train \
+    --do_test \
+    --meta_batch_size 1 \
+    --data_path /data/zhangyk/data \
+    --max_epoch 200 \
+    --gpu 1 \
+    --model_class LaplacianProtoNet \
+    --distance l2 \
+    --backbone_class Res18 \
+    --dataset MiniImageNet \
+    --train_way 5 --val_way 5 --test_way 5 \
+    --train_shot 1 --val_shot 1 --test_shot 1 \
+    --train_query 15 --val_query 15 --test_query 15 \
+    --logger_filename /z_logs \
+    --temperature 64 \
+    --lr 0.00005 --lr_mul 10 --lr_scheduler step \
+    --step_size 30 \
+    --gamma 0.8 \
+    --val_interval 1 \
+    --test_interval 0 \
+    --loss_fn F-cross_entropy \
+    --epoch_verbose \
+    --init_weights /home/zhangyk/pre_trained_weights \
+    --verbose

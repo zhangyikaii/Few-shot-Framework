@@ -1,0 +1,27 @@
+source activate zykycy
+python ../main.py \
+    --do_train \
+    --do_test \
+    --meta_batch_size 1 \
+    --data_path /mnt/data3/lus/zhangyk/data \
+    --max_epoch 1 \
+    --gpu 12,13,14,15 \
+    --model_class CRGPretrainClassifier \
+    --distance l2 \
+    --backbone_class Conv3dRes18GRU \
+    --dataset LRW \
+    --val_way 16 --test_way 5 \
+    --val_shot 1 --test_shot 1 \
+    --val_query 15 --test_query 15 \
+    --logger_filename /logs \
+    --temperature 64 \
+    --lr 0.00005 \
+    --lr_scheduler cosine \
+    --val_interval 1 \
+    --test_interval 0 \
+    --loss_fn nn-cross_entropy \
+    --batch_size 128 \
+    --multimodal_option video \
+    --grad_scaler \
+    --epoch_verbose \
+    --verbose
